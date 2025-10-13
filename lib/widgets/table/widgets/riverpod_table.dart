@@ -118,6 +118,9 @@ class RiverpodTable<T> extends ConsumerStatefulWidget {
   /// Chiều rộng của cột actions
   final double actionsColumnWidth;
 
+  /// Danh sách các nút hành động tùy chỉnh trong cột actions
+  final List<CustomAction<T>>? customActions;
+
   const RiverpodTable({
     super.key,
     required this.valueGetter,
@@ -145,6 +148,7 @@ class RiverpodTable<T> extends ConsumerStatefulWidget {
     this.onDelete,
     this.showActionsColumn = false,
     this.actionsColumnWidth = 120,
+    this.customActions, // Add this line to the initializer list
     this.showQuantityColumn = 16,
     this.rowHeight = 48,
     this.borderColor = Colors.grey,
@@ -314,7 +318,7 @@ class _RiverpodTableState<T> extends ConsumerState<RiverpodTable<T>> {
         TableColumnData(
           name: 'actions',
           key: 'actions',
-          width: widget.actionsColumnWidth,
+          width: widget.actionsColumnWidth + 30,
           isResizable: false,
           isSortable: false,
           isFilterable: false,
@@ -675,6 +679,7 @@ class _RiverpodTableState<T> extends ConsumerState<RiverpodTable<T>> {
                   item: item,
                   onEdit: widget.onEdit,
                   onDelete: widget.onDelete,
+                  customActions: widget.customActions, // Thêm dòng này
                 ),
               ),
             );
