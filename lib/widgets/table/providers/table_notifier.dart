@@ -16,6 +16,7 @@ class TableNotifier<T> extends TableNotifierInterface<T> {
           selectionState: const TableSelectionState(),
           columnsState: TableColumnsState(widths: {}),
           filterState: const TableFilterState(),
+          collapseState: const TableCollapseState(),
         ),
       );
 
@@ -422,6 +423,34 @@ class TableNotifier<T> extends TableNotifierInterface<T> {
         totalItems: searchedData.length,
         currentPage: 0, // Reset về trang đầu tiên
       ),
+    );
+  }
+
+  @override
+  void toggleRowCollapse(String rowId) {
+    state = state.copyWith(
+      collapseState: state.collapseState.toggleRowCollapse(rowId),
+    );
+  }
+
+  @override
+  void setRowCollapse(String rowId, bool collapsed) {
+    state = state.copyWith(
+      collapseState: state.collapseState.setRowCollapse(rowId, collapsed),
+    );
+  }
+
+  @override
+  void expandAllRows() {
+    state = state.copyWith(
+      collapseState: state.collapseState.expandAll(),
+    );
+  }
+
+  @override
+  void collapseAllRows() {
+    state = state.copyWith(
+      collapseState: state.collapseState.collapseAll(),
     );
   }
 }

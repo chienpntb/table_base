@@ -19,8 +19,14 @@ class TableRowData {
   final List<TableCellData?> cells;
   final double? height;
   final bool isSelected;
+  final bool isNestedTable;
 
-  TableRowData({required this.cells, this.height, this.isSelected = false});
+  TableRowData({
+    required this.cells, 
+    this.height, 
+    this.isSelected = false,
+    this.isNestedTable = false,
+  });
 }
 
 class TableData {

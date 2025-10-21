@@ -53,4 +53,16 @@ abstract class TableNotifierInterface<T> extends StateNotifier<GenericTableState
 
   /// Xóa tất cả bộ lọc
   void clearAllFilters();
+
+  /// Toggle trạng thái collapse/expand của một hàng cha
+  void toggleRowCollapse(String rowId);
+
+  /// Set trạng thái collapse của một hàng cha
+  void setRowCollapse(String rowId, bool collapsed);
+
+  /// Expand tất cả các hàng cha
+  void expandAllRows();
+
+  /// Collapse tất cả các hàng cha
+  void collapseAllRows();
 } 

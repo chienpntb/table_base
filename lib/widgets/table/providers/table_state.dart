@@ -146,6 +146,68 @@ class ColumnFilter {
   }
 }
 
+/// Trạng thái collapse/expand của các hàng phân cấp
+class TableCollapseState {
+  /// Map lưu trạng thái collapse của các hàng cha
+  /// Key: rowId, Value: true nếu collapsed, false nếu expanded
+  final Map<String, bool> collapsedRows;
+  
+  /// Có đang trong quá trình animation collapse/expand không
+  final bool isAnimating;
+
+  const TableCollapseState({
+    this.collapsedRows = const {},
+    this.isAnimating = false,
+  });
+
+  TableCollapseState copyWith({
+    Map<String, bool>? collapsedRows,
+    bool? isAnimating,
+  }) {
+    return TableCollapseState(
+      collapsedRows: collapsedRows ?? this.collapsedRows,
+      isAnimating: isAnimating ?? this.isAnimating,
+    );
+  }
+
+  /// Kiểm tra một hàng có bị collapse không
+  bool isRowCollapsed(String rowId) {
+    return collapsedRows[rowId] ?? true; // Mặc định là collapsed
+  }
+
+  /// Toggle trạng thái collapse của một hàng
+  TableCollapseState toggleRowCollapse(String rowId) {
+    final newCollapsedRows = Map<String, bool>.from(collapsedRows);
+    newCollapsedRows[rowId] = !isRowCollapsed(rowId);
+    return copyWith(collapsedRows: newCollapsedRows);
+  }
+
+  /// Set trạng thái collapse của một hàng
+  TableCollapseState setRowCollapse(String rowId, bool collapsed) {
+    final newCollapsedRows = Map<String, bool>.from(collapsedRows);
+    newCollapsedRows[rowId] = collapsed;
+    return copyWith(collapsedRows: newCollapsedRows);
+  }
+
+  /// Expand tất cả các hàng
+  TableCollapseState expandAll() {
+    final newCollapsedRows = Map<String, bool>.from(collapsedRows);
+    for (final key in newCollapsedRows.keys) {
+      newCollapsedRows[key] = false;
+    }
+    return copyWith(collapsedRows: newCollapsedRows);
+  }
+
+  /// Collapse tất cả các hàng
+  TableCollapseState collapseAll() {
+    final newCollapsedRows = Map<String, bool>.from(collapsedRows);
+    for (final key in newCollapsedRows.keys) {
+      newCollapsedRows[key] = true;
+    }
+    return copyWith(collapsedRows: newCollapsedRows);
+  }
+}
+
 /// Trạng thái tổng hợp của bảng dữ liệu
 class GenericTableState<T> {
   final List<T> allData;
@@ -158,6 +220,7 @@ class GenericTableState<T> {
   final TableSelectionState selectionState;
   final TableColumnsState columnsState;
   final TableFilterState filterState;
+  final TableCollapseState collapseState;
   final String? searchQuery;
 
   const GenericTableState({
@@ -171,6 +234,7 @@ class GenericTableState<T> {
     required this.selectionState,
     required this.columnsState,
     required this.filterState,
+    required this.collapseState,
     this.searchQuery,
   });
 
@@ -185,6 +249,7 @@ class GenericTableState<T> {
     TableSelectionState? selectionState,
     TableColumnsState? columnsState,
     TableFilterState? filterState,
+    TableCollapseState? collapseState,
     String? searchQuery,
   }) {
     return GenericTableState<T>(
@@ -198,6 +263,7 @@ class GenericTableState<T> {
       selectionState: selectionState ?? this.selectionState,
       columnsState: columnsState ?? this.columnsState,
       filterState: filterState ?? this.filterState,
+      collapseState: collapseState ?? this.collapseState,
       searchQuery: searchQuery ?? this.searchQuery,
     );
   }

@@ -7,6 +7,7 @@ import 'package:table_base/widgets/table/widgets/pagination_bar.dart';
 import 'package:table_base/widgets/table/widgets/table_actions_widget.dart';
 import 'package:table_base/widgets/table/widgets/table_content_widget.dart';
 import 'package:table_base/widgets/table/widgets/table_header_widget.dart';
+import 'package:table_base/widgets/table/widgets/collapse_expand_widget.dart';
 import '../models/table_model.dart';
 import '../providers/table_state.dart';
 import '../providers/table_notifier_interface.dart';
@@ -47,6 +48,46 @@ class RiverpodTable<T> extends ConsumerStatefulWidget {
 
   /// Danh sách cấu hình các cột
   final List<TableColumnData> columns;
+
+  // === HIERARCHICAL FEATURES (OPTIONAL) ===
+  /// Callback để kiểm tra xem một item có phải là hàng cha không
+  final bool Function(T item)? isParentRowGetter;
+  
+  /// Callback để lấy danh sách các item con từ item cha
+  final List<T> Function(T item)? getChildItems;
+  
+  /// Callback để lấy ID của hàng (dùng cho collapse/expand)
+  final String Function(T item)? rowIdGetter;
+  
+  /// Có bật animation cho collapse/expand không
+  final bool enableCollapseAnimation;
+  
+  /// Màu nền cho hàng con
+  final Color? childRowBackgroundColor;
+  
+  /// Padding cho hàng con
+  final EdgeInsets? childRowPadding;
+  
+  /// Hiển thị phần con như nested table riêng biệt
+  final bool showChildAsNestedTable;
+  
+  /// Widget builder cho nested table (chỉ dùng khi showChildAsNestedTable = true)
+  final Widget Function(T item)? childTableBuilder;
+  
+  /// Async widget builder cho nested table (lazy loading)
+  final Future<Widget> Function(T item)? childTableBuilderAsync;
+  
+  /// Thời gian delay khi lazy loading (mặc định: 300ms)
+  final Duration lazyLoadingDelay;
+  
+  /// Chiều cao tối thiểu cho nested table
+  final double? nestedTableMinHeight;
+  
+  /// Chiều cao tối đa cho nested table
+  final double? nestedTableMaxHeight;
+  
+  /// Tỷ lệ chiều cao nested table so với table chính (mặc định: 0.6 = 60%)
+  final double nestedTableHeightRatio;
 
   /// Cho phép chọn hàng khi nhấp vào
   final bool enableRowSelection;
@@ -156,6 +197,20 @@ class RiverpodTable<T> extends ConsumerStatefulWidget {
     this.headerHeight = 48,
     this.showPageSizeFilter = 100,
     this.maxHeight,
+    // === HIERARCHICAL FEATURES ===
+    this.isParentRowGetter,
+    this.getChildItems,
+    this.rowIdGetter,
+    this.enableCollapseAnimation = true,
+    this.childRowBackgroundColor,
+    this.childRowPadding = const EdgeInsets.only(left: 24.0),
+    this.showChildAsNestedTable = false,
+    this.childTableBuilder,
+    this.childTableBuilderAsync,
+    this.lazyLoadingDelay = const Duration(milliseconds: 300),
+    this.nestedTableMinHeight,
+    this.nestedTableMaxHeight,
+    this.nestedTableHeightRatio = 0.6,
   });
 
   @override
@@ -488,11 +543,13 @@ class _RiverpodTableState<T> extends ConsumerState<RiverpodTable<T>> {
             radius: const Radius.circular(6),
           ),
           child: Column(
-            mainAxisSize: MainAxisSize.min,
+            mainAxisSize: MainAxisSize.max,
             children: [
-              Stack(
-                children: [
+              Expanded(
+                child: Stack(
+                  children: [
                   Column(
+                    mainAxisSize: MainAxisSize.max,
                     children: [
                       // Header của bảng
                       TableHeaderWidget<T>(
@@ -521,7 +578,8 @@ class _RiverpodTableState<T> extends ConsumerState<RiverpodTable<T>> {
                         onFinishResizing: _finishResizing,
                       ),
                       // Nội dung bảng
-                      TableContentWidget<T>(
+                      Expanded(
+                        child: TableContentWidget<T>(
                         tableProvider: widget.tableProvider,
                         showQuantityColumn: widget.showQuantityColumn,
                         maxHeight: widget.maxHeight,
@@ -538,6 +596,7 @@ class _RiverpodTableState<T> extends ConsumerState<RiverpodTable<T>> {
                         tableData: _createTableData(),
                         bodyController: _bodyController,
                         verticalScrollController: verticalScrollController,
+                        ),
                       ),
                       const SizedBox(height: 4),
                       _buildHorizontalScrollbar(),
@@ -546,7 +605,8 @@ class _RiverpodTableState<T> extends ConsumerState<RiverpodTable<T>> {
                   // Đường kẻ preview khi resize cột
                   if (_isResizing && _resizingColumnIndex >= 0)
                     _buildPreviewLine(),
-                ],
+                  ],
+                ),
               ),
               // Thanh phân trang
               PaginationBar<T>(tableProvider: widget.tableProvider),
@@ -613,8 +673,17 @@ class _RiverpodTableState<T> extends ConsumerState<RiverpodTable<T>> {
   TableData _createTableData() {
     final tableState = ref.watch(widget.tableProvider);
     final notifier = ref.read(widget.tableProvider.notifier);
-    // removed verbose build log
-    // Tạo các hàng dữ liệu
+    
+    // Kiểm tra xem có sử dụng tính năng hierarchical không
+    final bool isHierarchical = widget.isParentRowGetter != null && 
+                               widget.getChildItems != null && 
+                               widget.rowIdGetter != null;
+    
+    if (isHierarchical) {
+      return _createHierarchicalTableData(tableState, notifier);
+    }
+    
+    // Logic cũ cho table thường
     final dataRows = List<TableRowData>.generate(
       tableState.currentPageData.length,
       (index) {
@@ -715,6 +784,214 @@ class _RiverpodTableState<T> extends ConsumerState<RiverpodTable<T>> {
       showAlternatingRowColors: widget.showAlternatingRowColors,
       alternateColor: widget.alternateColor ?? Colors.grey.shade100,
     );
+  }
+
+  /// Tạo TableData cho hierarchical table
+  TableData _createHierarchicalTableData(GenericTableState<T> tableState, TableNotifierInterface<T> notifier) {
+    final List<TableRowData> dataRows = [];
+    
+    for (final item in tableState.currentPageData) {
+      // Thêm hàng cha
+      final parentRow = _buildHierarchicalRow(item, tableState, notifier, false);
+      dataRows.add(parentRow);
+      
+      // Kiểm tra xem có phải hàng cha không và có bị collapse không
+      if (widget.isParentRowGetter!(item)) {
+        final rowId = widget.rowIdGetter!(item);
+        final isCollapsed = tableState.collapseState.isRowCollapsed(rowId);
+        
+        if (!isCollapsed) {
+          // Luôn hiển thị các hàng con thụt lề như trong ảnh
+          final childItems = widget.getChildItems!(item);
+          for (final childItem in childItems) {
+            final childRow = _buildHierarchicalRow(childItem, tableState, notifier, true);
+            dataRows.add(childRow);
+          }
+        }
+      }
+    }
+    
+    final orderedWidths = _columns
+        .map((c) => _lastComputedWidths[c.key] ?? c.width)
+        .toList(growable: false);
+    
+    return TableData(
+      rows: dataRows,
+      columnWidths: orderedWidths,
+      showAlternatingRowColors: widget.showAlternatingRowColors,
+      alternateColor: widget.alternateColor ?? Colors.grey.shade100,
+    );
+  }
+
+  /// Xây dựng một hàng cho hierarchical table
+  TableRowData _buildHierarchicalRow(T item, GenericTableState<T> tableState, TableNotifierInterface<T> notifier, bool isChild) {
+    // Kiểm tra xem mục này có được chọn không
+    final dynamic itemId = widget.idGetter != null
+        ? widget.idGetter!(item)
+        : (item as dynamic).id;
+    
+    final String? itemIdString = itemId?.toString();
+    final bool isItemSelected = itemIdString != null &&
+        tableState.selectionState.selectedIds
+            .map((id) => id.toString())
+            .contains(itemIdString);
+
+    // Dựng lại danh sách ô theo đúng thứ tự hiển thị hiện tại của _columns
+    final List<TableCellData?> cells = [];
+    final List<TableCellData?> builtCells = widget.cellsBuilder != null ? widget.cellsBuilder!(item) : [];
+
+    for (int colIndex = 0; colIndex < _columns.length; colIndex++) {
+      final column = _columns[colIndex];
+
+      // Cột checkbox
+      if (widget.showCheckboxColumn && column.key == 'checkbox') {
+        cells.add(
+          TableCellData(
+            widget: Checkbox(
+              activeColor: AppColor.greenLight,
+              checkColor: Colors.white,
+              side: BorderSide(color: AppColor.textGrey, width: 1.6),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(4),
+              ),
+              overlayColor: WidgetStatePropertyAll<Color>(
+                AppColor.textGrey.withValues(alpha: .2),
+              ),
+              value: isItemSelected,
+              onChanged: itemId == null ? null : (_) => notifier.toggleItemSelection(itemId),
+            ),
+          ),
+        );
+        continue;
+      }
+
+      // Cột actions
+      if (widget.showActionsColumn && column.key == 'actions') {
+        cells.add(
+          TableCellData(
+            widget: TableActionsWidget<T>(
+              item: item,
+              onEdit: widget.onEdit,
+              onDelete: widget.onDelete,
+              customActions: widget.customActions,
+            ),
+          ),
+        );
+        continue;
+      }
+
+      // Cột đầu tiên - thêm nút collapse/expand cho hàng cha
+      if (!isChild && widget.isParentRowGetter!(item) && colIndex == (widget.showCheckboxColumn ? 1 : 0)) {
+        final rowId = widget.rowIdGetter!(item);
+        final isCollapsed = tableState.collapseState.isRowCollapsed(rowId);
+        
+        cells.add(
+          TableCellData(
+            widget: Row(
+              children: [
+                CollapseExpandButton(
+                  isCollapsed: isCollapsed,
+                  onTap: () {
+                    notifier.toggleRowCollapse(rowId);
+                  },
+                  enableAnimation: widget.enableCollapseAnimation,
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: _buildCellContent(item, column.key),
+                ),
+              ],
+            ),
+          ),
+        );
+        continue;
+      }
+
+      // Cột đầu tiên cho hàng con - thêm thụt lề
+      if (isChild && colIndex == (widget.showCheckboxColumn ? 1 : 0)) {
+        cells.add(
+          TableCellData(
+            widget: Container(
+              color: widget.childRowBackgroundColor ?? Colors.purple.withOpacity(0.1), // Màu nền như trong ảnh
+              child: Padding(
+                padding: const EdgeInsets.only(left: 32.0), // Thụt lề như trong ảnh
+                child: _buildCellContent(item, column.key),
+              ),
+            ),
+          ),
+        );
+        continue;
+      }
+
+      // Các cột khác
+      if (widget.cellBuilderByKey != null) {
+        final customCell = widget.cellBuilderByKey!(item, column.key);
+        if (customCell != null) {
+          // Thêm màu nền cho hàng con
+          if (isChild) {
+            cells.add(TableCellData(
+              widget: Container(
+                color: widget.childRowBackgroundColor ?? Colors.purple.withOpacity(0.1),
+                child: customCell.widget,
+              ),
+            ));
+          } else {
+            cells.add(customCell);
+          }
+          continue;
+        }
+      }
+
+      // Fallback sang cellsBuilder theo vị trí
+      if (colIndex < builtCells.length) {
+        if (isChild) {
+          cells.add(TableCellData(
+            widget: Container(
+              color: widget.childRowBackgroundColor ?? Colors.purple.withOpacity(0.1),
+              child: builtCells[colIndex]?.widget ?? const SizedBox(),
+            ),
+          ));
+        } else {
+          cells.add(builtCells[colIndex]);
+        }
+      } else {
+        if (isChild) {
+          cells.add(TableCellData(
+            widget: Container(
+              color: widget.childRowBackgroundColor ?? Colors.purple.withOpacity(0.1),
+              child: const SizedBox(),
+            ),
+          ));
+        } else {
+          cells.add(TableCellData(widget: const SizedBox()));
+        }
+      }
+    }
+
+    return TableRowData(
+      cells: cells, 
+      isSelected: isItemSelected,
+      height: widget.rowHeight,
+    );
+  }
+
+  /// Xây dựng nội dung cell
+  Widget _buildCellContent(T item, String key) {
+    if (widget.cellBuilderByKey != null) {
+      final customCell = widget.cellBuilderByKey!(item, key);
+      if (customCell != null) {
+        return customCell.widget;
+      }
+    }
+    
+    // Fallback sang valueGetter
+    final columnIndex = _columns.indexWhere((c) => c.key == key);
+    if (columnIndex >= 0) {
+      final value = widget.valueGetter(item, columnIndex);
+      return Text(value?.toString() ?? '');
+    }
+    
+    return const SizedBox();
   }
 
   /// Tính toán độ rộng cột thông minh với hệ thống flex layout
