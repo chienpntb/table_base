@@ -3,7 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:table_base/core/themes/app_color.dart';
 import 'package:table_base/widgets/table/models/table_model.dart';
 import 'package:table_base/widgets/table/providers/table_state.dart';
-import 'package:table_base/widgets/table/widgets/expandable_riverpod_table.dart';
+import 'package:table_base/widgets/table/widgets/expandable_riverpod_table_v2.dart';
 import 'package:table_base/widgets/table/providers/table_notifier.dart';
 
 /// Model cho Employee (dữ liệu cha)
@@ -69,6 +69,11 @@ class ExpandableTableExample extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final tableState = ref.watch(expandableTableProvider);
+    
+    // Debug: In ra trạng thái table
+    print('Table state: isLoading=${tableState.isLoading}, dataCount=${tableState.currentPageData.length}');
+    
     return Scaffold(
       appBar: AppBar(
         title: const Text('Expandable Table Example'),
@@ -527,6 +532,8 @@ class _ExpandableTableExampleWithDataState extends ConsumerState<ExpandableTable
       ),
     ];
 
+    // Debug: In ra để kiểm tra
+    print('Loading ${sampleEmployees.length} employees');
     ref.read(expandableTableProvider.notifier).loadData(sampleEmployees);
   }
 

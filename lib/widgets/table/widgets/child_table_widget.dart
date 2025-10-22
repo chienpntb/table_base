@@ -223,6 +223,7 @@ class ChildTableWidget<C> extends StatelessWidget {
       return '';
     }
   }
+
 }
 
 /// Model cho column alignment
