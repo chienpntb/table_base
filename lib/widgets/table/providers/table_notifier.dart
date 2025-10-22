@@ -249,10 +249,13 @@ class TableNotifier<T> extends TableNotifierInterface<T> {
 
   /// Áp dụng tất cả bộ lọc hiện tại
   void _applyFilters() {
+    print('_applyFilters called with ${state.allData.length} allData items');
+    print('Active filters: ${state.filterState.columnFilters.length}');
     List<T> filteredData = List<T>.from(state.allData);
 
     // Áp dụng từng bộ lọc
     for (final filter in state.filterState.columnFilters.values) {
+      print('Applying filter for column ${filter.columnIndex}: ${filter.filterType}');
       filteredData = _filterDataByColumn(filteredData, filter);
     }
 
@@ -261,6 +264,8 @@ class TableNotifier<T> extends TableNotifierInterface<T> {
 
     // Cập nhật pagination
     final paginatedData = _getPaginatedData(sortedData);
+
+    print('Final filtered data: ${filteredData.length}, paginated: ${paginatedData.length}');
 
     state = state.copyWith(
       filteredData: sortedData,
@@ -274,19 +279,32 @@ class TableNotifier<T> extends TableNotifierInterface<T> {
 
   /// Lọc dữ liệu theo một cột cụ thể
   List<T> _filterDataByColumn(List<T> data, ColumnFilter filter) {
-    if (_valueGetter == null) return data;
+    print('_filterDataByColumn called with ${data.length} items, filter: ${filter.filterType}');
+    if (_valueGetter == null) {
+      print('_valueGetter is null, returning original data');
+      return data;
+    }
 
-    return data.where((item) {
+    final filteredData = data.where((item) {
       final value = _valueGetter!(item, filter.columnIndex);
-      return _evaluateFilterCondition(value, filter);
+      final result = _evaluateFilterCondition(value, filter);
+      print('Filtering item: $item, value: $value, result: $result');
+      return result;
     }).toList();
+    
+    print('Filtered data length: ${filteredData.length}');
+    return filteredData;
   }
 
   /// Đánh giá điều kiện lọc
   bool _evaluateFilterCondition(dynamic value, ColumnFilter filter) {
+    print('_evaluateFilterCondition: value=$value, filterType=${filter.filterType}');
+    
     // Lọc theo filter chọn nhiều giá trị
     if (filter.filterType == FilterType.select) {
-      return filter.selectedValues.contains(value);
+      final result = filter.selectedValues.contains(value);
+      print('Select filter: selectedValues=${filter.selectedValues}, result=$result');
+      return result;
     }
 
     // Lọc theo khoảng số [min, max]

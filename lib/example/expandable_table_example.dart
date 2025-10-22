@@ -1,3 +1,5 @@
+import 'dart:developer';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:table_base/core/themes/app_color.dart';
@@ -69,19 +71,312 @@ class ExpandableTableExample extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final tableState = ref.watch(expandableTableProvider);
+    
     return Scaffold(
       appBar: AppBar(
         title: const Text('Expandable Table Example'),
         backgroundColor: AppColor.greenLight,
         foregroundColor: Colors.white,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.refresh),
+            onPressed: () {
+              print('Reload button pressed in ExpandableTableExample');
+              // Force reload data
+              final sampleEmployees = [
+                const Employee(
+                  id: '1',
+                  name: 'Providenci Alten',
+                  email: 'Alten@address.com',
+                  registered: 'February 14, 2020',
+                  rankings: 3.5,
+                  status: 'Available',
+                  transaction: 'ARB-8947',
+                  division: 'Sales',
+                  location: 'Chicago, IL',
+                  progress: 98.0,
+                  score: 15384,
+                ),
+                const Employee(
+                  id: '2',
+                  name: 'John Doe',
+                  email: 'john@example.com',
+                  registered: 'March 15, 2020',
+                  rankings: 4.0,
+                  status: 'On project',
+                  transaction: 'ARB-2560',
+                  division: 'Marketing',
+                  location: 'New York, NY',
+                  progress: 100.0,
+                  score: 32127,
+                ),
+                const Employee(
+                  id: '3',
+                  name: 'Jane Smith',
+                  email: 'jane@example.com',
+                  registered: 'April 20, 2020',
+                  rankings: 3.5,
+                  status: 'No project',
+                  transaction: 'ARB-1234',
+                  division: 'Design',
+                  location: 'Los Angeles, CA',
+                  progress: 76.0,
+                  score: 25000,
+                ),
+                const Employee(
+                  id: '4',
+                  name: 'Bob Johnson',
+                  email: 'bob@example.com',
+                  registered: 'May 10, 2020',
+                  rankings: 5.0,
+                  status: 'Offline',
+                  transaction: 'ARB-5678',
+                  division: 'Engineering',
+                  location: 'Seattle, WA',
+                  progress: 81.0,
+                  score: 45000,
+                ),
+              ];
+              ref.read(expandableTableProvider.notifier).loadData(sampleEmployees);
+            },
+            tooltip: 'Reload Data',
+          ),
+        ],
+      ),
+      floatingActionButton: FloatingActionButton(
+        onPressed: () {
+          print('Floating action button pressed - reloading data');
+          final sampleEmployees = [
+            const Employee(
+              id: '1',
+              name: 'Providenci Alten',
+              email: 'Alten@address.com',
+              registered: 'February 14, 2020',
+              rankings: 3.5,
+              status: 'Available',
+              transaction: 'ARB-8947',
+              division: 'Sales',
+              location: 'Chicago, IL',
+              progress: 98.0,
+              score: 15384,
+            ),
+            const Employee(
+              id: '2',
+              name: 'John Doe',
+              email: 'john@example.com',
+              registered: 'March 15, 2020',
+              rankings: 4.0,
+              status: 'On project',
+              transaction: 'ARB-2560',
+              division: 'Marketing',
+              location: 'New York, NY',
+              progress: 100.0,
+              score: 32127,
+            ),
+            const Employee(
+              id: '3',
+              name: 'Jane Smith',
+              email: 'jane@example.com',
+              registered: 'April 20, 2020',
+              rankings: 3.5,
+              status: 'No project',
+              transaction: 'ARB-1234',
+              division: 'Design',
+              location: 'Los Angeles, CA',
+              progress: 76.0,
+              score: 25000,
+            ),
+            const Employee(
+              id: '4',
+              name: 'Bob Johnson',
+              email: 'bob@example.com',
+              registered: 'May 10, 2020',
+              rankings: 5.0,
+              status: 'Offline',
+              transaction: 'ARB-5678',
+              division: 'Engineering',
+              location: 'Seattle, WA',
+              progress: 81.0,
+              score: 45000,
+            ),
+          ];
+          ref.read(expandableTableProvider.notifier).loadData(sampleEmployees);
+        },
+        tooltip: 'Reload Data',
+        child: const Icon(Icons.refresh),
       ),
       body: Padding(
         padding: const EdgeInsets.all(16.0),
         child: Column(
           children: [
-            const Text(
-              'Employee Table with Dessert Details',
-              style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Text(
+                  'Employee Table with Dessert Details',
+                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                ),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    Text(
+                      'Data: ${tableState.allData.length} items',
+                      style: const TextStyle(fontSize: 14, color: Colors.grey),
+                    ),
+                    Text(
+                      'Loading: ${tableState.isLoading}',
+                      style: const TextStyle(fontSize: 12, color: Colors.orange),
+                    ),
+                    if (tableState.errorMessage != null)
+                      Text(
+                        'Error: ${tableState.errorMessage}',
+                        style: const TextStyle(fontSize: 12, color: Colors.red),
+                      ),
+                  ],
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            // Debug buttons
+            Row(
+              children: [
+                ElevatedButton.icon(
+                  onPressed: () {
+                    print('Manual load data button pressed');
+                    final sampleEmployees = [
+                      const Employee(
+                        id: '1',
+                        name: 'Providenci Alten',
+                        email: 'Alten@address.com',
+                        registered: 'February 14, 2020',
+                        rankings: 3.5,
+                        status: 'Available',
+                        transaction: 'ARB-8947',
+                        division: 'Sales',
+                        location: 'Chicago, IL',
+                        progress: 98.0,
+                        score: 15384,
+                      ),
+                      const Employee(
+                        id: '2',
+                        name: 'John Doe',
+                        email: 'john@example.com',
+                        registered: 'March 15, 2020',
+                        rankings: 4.0,
+                        status: 'On project',
+                        transaction: 'ARB-2560',
+                        division: 'Marketing',
+                        location: 'New York, NY',
+                        progress: 100.0,
+                        score: 32127,
+                      ),
+                      const Employee(
+                        id: '3',
+                        name: 'Jane Smith',
+                        email: 'jane@example.com',
+                        registered: 'April 20, 2020',
+                        rankings: 3.5,
+                        status: 'No project',
+                        transaction: 'ARB-1234',
+                        division: 'Design',
+                        location: 'Los Angeles, CA',
+                        progress: 76.0,
+                        score: 25000,
+                      ),
+                      const Employee(
+                        id: '4',
+                        name: 'Bob Johnson',
+                        email: 'bob@example.com',
+                        registered: 'May 10, 2020',
+                        rankings: 5.0,
+                        status: 'Offline',
+                        transaction: 'ARB-5678',
+                        division: 'Engineering',
+                        location: 'Seattle, WA',
+                        progress: 81.0,
+                        score: 45000,
+                      ),
+                    ];
+                    ref.read(expandableTableProvider.notifier).loadData(sampleEmployees);
+                  },
+                  icon: const Icon(Icons.add),
+                  label: const Text('Load Sample Data'),
+                ),
+                const SizedBox(width: 10),
+                ElevatedButton.icon(
+                  onPressed: () {
+                    print('Reload data button pressed');
+                    // Reload the same data
+                    final sampleEmployees = [
+                      const Employee(
+                        id: '1',
+                        name: 'Providenci Alten',
+                        email: 'Alten@address.com',
+                        registered: 'February 14, 2020',
+                        rankings: 3.5,
+                        status: 'Available',
+                        transaction: 'ARB-8947',
+                        division: 'Sales',
+                        location: 'Chicago, IL',
+                        progress: 98.0,
+                        score: 15384,
+                      ),
+                      const Employee(
+                        id: '2',
+                        name: 'John Doe',
+                        email: 'john@example.com',
+                        registered: 'March 15, 2020',
+                        rankings: 4.0,
+                        status: 'On project',
+                        transaction: 'ARB-2560',
+                        division: 'Marketing',
+                        location: 'New York, NY',
+                        progress: 100.0,
+                        score: 32127,
+                      ),
+                      const Employee(
+                        id: '3',
+                        name: 'Jane Smith',
+                        email: 'jane@example.com',
+                        registered: 'April 20, 2020',
+                        rankings: 3.5,
+                        status: 'No project',
+                        transaction: 'ARB-1234',
+                        division: 'Design',
+                        location: 'Los Angeles, CA',
+                        progress: 76.0,
+                        score: 25000,
+                      ),
+                      const Employee(
+                        id: '4',
+                        name: 'Bob Johnson',
+                        email: 'bob@example.com',
+                        registered: 'May 10, 2020',
+                        rankings: 5.0,
+                        status: 'Offline',
+                        transaction: 'ARB-5678',
+                        division: 'Engineering',
+                        location: 'Seattle, WA',
+                        progress: 81.0,
+                        score: 45000,
+                      ),
+                    ];
+                    ref.read(expandableTableProvider.notifier).loadData(sampleEmployees);
+                  },
+                  icon: const Icon(Icons.refresh),
+                  label: const Text('Reload Data'),
+                ),
+                const SizedBox(width: 10),
+                ElevatedButton.icon(
+                  onPressed: () {
+                    print('Clear data button pressed');
+                    ref.read(expandableTableProvider.notifier).loadData([]);
+                  },
+                  icon: const Icon(Icons.clear),
+                  label: const Text('Clear Data'),
+                ),
+              ],
             ),
             const SizedBox(height: 16),
             Expanded(
@@ -92,6 +387,7 @@ class ExpandableTableExample extends ConsumerWidget {
                 columns: _getParentColumns(),
                 valueGetter: _getValue,
                 cellBuilderByKey: _buildCellByKey,
+                childCellBuilder: _buildChildCell,
                 childTableTitle: 'Dessert Details',
                 childTableBackgroundColor: Colors.yellow.shade50,
                 childTableMaxHeight: 200,
@@ -104,9 +400,7 @@ class ExpandableTableExample extends ConsumerWidget {
                 hoverColor: Colors.blue.shade50,
                 selectedRowColor: Colors.blue.shade100,
                 onRowTap: (employee) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('Selected: ${employee.name}')),
-                  );
+                  log('Selected: ${employee.name}');
                 },
                 onEdit: (employee) {
                   _showEditDialog(context, employee);
@@ -125,54 +419,126 @@ class ExpandableTableExample extends ConsumerWidget {
   /// Lấy dữ liệu con từ dữ liệu cha
   List<Dessert>? _getChildData(Employee employee) {
     // Simulate data - trong thực tế có thể lấy từ API
-    return _getDessertsForEmployee(employee.id);
+    final desserts = _getDessertsForEmployee(employee.id);
+    return desserts;
+  }
+
+  /// Tạo cell cho child table
+  TableCellData? _buildChildCell(Dessert dessert, String columnKey) {
+    switch (columnKey) {
+      case 'name':
+        return TableCellData(
+          widget: Text(
+            dessert.name,
+            style: const TextStyle(fontSize: 12),
+          ),
+        );
+      case 'commits':
+        return TableCellData(
+          widget: Text(
+            dessert.commits.toString(),
+            style: const TextStyle(fontSize: 12),
+          ),
+        );
+      case 'tasks':
+        return TableCellData(
+          widget: Text(
+            dessert.tasks.toString(),
+            style: const TextStyle(fontSize: 12),
+          ),
+        );
+      case 'projects':
+        return TableCellData(
+          widget: Text(
+            dessert.projects.toString(),
+            style: const TextStyle(fontSize: 12),
+          ),
+        );
+      case 'hours':
+        return TableCellData(
+          widget: Text(
+            dessert.hours.toString(),
+            style: const TextStyle(fontSize: 12),
+          ),
+        );
+      case 'wins':
+        return TableCellData(
+          widget: Text(
+            dessert.wins.toString(),
+            style: const TextStyle(fontSize: 12),
+          ),
+        );
+      case 'score':
+        return TableCellData(
+          widget: Text(
+            dessert.score.toString(),
+            style: const TextStyle(fontSize: 12),
+          ),
+        );
+      default:
+        return null;
+    }
   }
 
   /// Tạo columns cho table cha
   List<TableColumnData> _getParentColumns() {
     return [
-      TableColumnData.simple(
+      TableColumnData.select(
         name: 'Employee',
         key: 'name',
         width: 200,
         flex: 1,
+        isFilterable: true,
       ),
-      TableColumnData.simple(
+      TableColumnData.select(
         name: 'Registered',
         key: 'registered',
         width: 120,
+        isFilterable: true,
       ),
-      TableColumnData.simple(
+      TableColumnData.withFilter(
         name: 'Rankings',
         key: 'rankings',
         width: 100,
+        isFilterable: true,
+        filterType: FilterType.number,
       ),
-      TableColumnData.simple(
+      TableColumnData.withFilter(
         name: 'Status',
         key: 'status',
         width: 120,
+        isFilterable: true,
+        filterType: FilterType.select,
       ),
-      TableColumnData.simple(
+      TableColumnData.withFilter(
         name: 'Transaction',
         key: 'transaction',
         width: 120,
+        isFilterable: true,
+        filterType: FilterType.select,
       ),
-      TableColumnData.simple(
+      TableColumnData.withFilter(
         name: 'Division',
         key: 'division',
         width: 120,
+        isFilterable: true,
+        filterType: FilterType.select,
       ),
-      TableColumnData.simple(
+      TableColumnData.withFilter(
         name: 'Location',
         key: 'location',
         width: 150,
+        isFilterable: true,
+        filterType: FilterType.select,
       ),
-      TableColumnData.simple(
+      TableColumnData.withFilter(
         name: 'Progress',
         key: 'progress',
         width: 100,
+        isFilterable: true,
+        filterType: FilterType.number,
       ),
-      TableColumnData.simple(
+      TableColumnData(
         name: 'Score',
         key: 'score',
         width: 100,
@@ -183,37 +549,37 @@ class ExpandableTableExample extends ConsumerWidget {
   /// Tạo columns cho table con
   List<TableColumnData> _getChildColumns() {
     return [
-      TableColumnData.simple(
+      TableColumnData(
         name: 'Dessert',
         key: 'name',
         width: 200,
       ),
-      TableColumnData.simple(
+      TableColumnData(
         name: 'Commits',
         key: 'commits',
         width: 120,
       ),
-      TableColumnData.simple(
+      TableColumnData(
         name: 'Tasks',
         key: 'tasks',
         width: 100,
       ),
-      TableColumnData.simple(
+      TableColumnData(
         name: 'Projects',
         key: 'projects',
         width: 120,
       ),
-      TableColumnData.simple(
+      TableColumnData(
         name: 'Hours',
         key: 'hours',
         width: 120,
       ),
-      TableColumnData.simple(
+      TableColumnData(
         name: 'Wins',
         key: 'wins',
         width: 100,
       ),
-      TableColumnData.simple(
+      TableColumnData(
         name: 'Score',
         key: 'score',
         width: 100,
@@ -250,13 +616,6 @@ class ExpandableTableExample extends ConsumerWidget {
                 item.name,
                 style: const TextStyle(fontWeight: FontWeight.bold),
               ),
-              Text(
-                item.email,
-                style: TextStyle(
-                  fontSize: 12,
-                  color: Colors.grey.shade600,
-                ),
-              ),
             ],
           ),
         );
@@ -264,14 +623,14 @@ class ExpandableTableExample extends ConsumerWidget {
         return TableCellData(
           widget: Row(
             children: [
-              ...List.generate(5, (index) {
-                return Icon(
-                  index < item.rankings ? Icons.star : Icons.star_border,
-                  size: 16,
-                  color: Colors.amber,
-                );
-              }),
-              const SizedBox(width: 4),
+              // ...List.generate(5, (index) {
+              //   return Icon(
+              //     index < item.rankings ? Icons.star : Icons.star_border,
+              //     size: 16,
+              //     color: Colors.amber,
+              //   );
+              // }),
+              // const SizedBox(width: 4),
               Text('${item.rankings}'),
             ],
           ),
@@ -465,13 +824,16 @@ class _ExpandableTableExampleWithDataState extends ConsumerState<ExpandableTable
   @override
   void initState() {
     super.initState();
+    print('ExpandableTableExampleWithData initState called');
     // Khởi tạo dữ liệu mẫu
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      print('PostFrameCallback executed, loading sample data...');
       _loadSampleData();
     });
   }
 
   void _loadSampleData() {
+    print('Loading sample data...');
     final sampleEmployees = [
       const Employee(
         id: '1',
@@ -527,11 +889,31 @@ class _ExpandableTableExampleWithDataState extends ConsumerState<ExpandableTable
       ),
     ];
 
+    print('Sample data created with ${sampleEmployees.length} employees');
     ref.read(expandableTableProvider.notifier).loadData(sampleEmployees);
+    print('Data loaded into provider');
   }
 
   @override
   Widget build(BuildContext context) {
-    return const ExpandableTableExample();
+    print('ExpandableTableExampleWithData build called');
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Expandable Table Example'),
+        backgroundColor: AppColor.greenLight,
+        foregroundColor: Colors.white,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.refresh),
+            onPressed: () {
+              print('Reload button pressed');
+              _loadSampleData();
+            },
+            tooltip: 'Reload Data',
+          ),
+        ],
+      ),
+      body: const ExpandableTableExample(),
+    );
   }
 }

@@ -36,7 +36,9 @@ class ChildTableWidget<C> extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    print('ChildTableWidget build - childData length: ${childData.length}');
     if (childData.isEmpty) {
+      print('ChildTableWidget - childData is empty, returning SizedBox.shrink()');
       return const SizedBox.shrink();
     }
 
@@ -133,6 +135,7 @@ class ChildTableWidget<C> extends StatelessWidget {
 
   /// Tạo TableData cho child table
   TableData _createChildTableData(List<AlignedColumn> alignedColumns) {
+    print('_createChildTableData called with ${childData.length} child items and ${alignedColumns.length} columns');
     final rows = <TableRowData>[];
     
     // Tạo header row
@@ -158,11 +161,15 @@ class ChildTableWidget<C> extends StatelessWidget {
       );
     }
     rows.add(TableRowData(cells: headerCells));
+    print('Header row created with ${headerCells.length} cells');
     
     // Tạo data rows
-    for (final childItem in childData) {
+    print('Creating data rows for ${childData.length} child items');
+    for (int itemIndex = 0; itemIndex < childData.length; itemIndex++) {
+      final childItem = childData[itemIndex];
       final rowCells = <TableCellData?>[];
       
+      print('Processing child item $itemIndex: $childItem');
       for (int i = 0; i < childColumns.length; i++) {
         final column = childColumns[i];
         
@@ -173,9 +180,11 @@ class ChildTableWidget<C> extends StatelessWidget {
         
         if (cellData == null) {
           // Fallback: hiển thị giá trị mặc định
+          final defaultValue = _getDefaultValue(childItem, column.key);
+          print('Using default value for column ${column.key}: $defaultValue');
           cellData = TableCellData(
             widget: Text(
-              _getDefaultValue(childItem, column.key),
+              defaultValue,
               style: const TextStyle(fontSize: 12),
             ),
           );
@@ -188,6 +197,7 @@ class ChildTableWidget<C> extends StatelessWidget {
         cells: rowCells,
         height: rowHeight,
       ));
+      print('Added row $itemIndex with ${rowCells.length} cells');
     }
     
     // Tính column widths dựa trên parent columns
@@ -200,6 +210,7 @@ class ChildTableWidget<C> extends StatelessWidget {
       }
     }
     
+    print('Final TableData created with ${rows.length} rows and ${columnWidths.length} column widths');
     return TableData(
       rows: rows,
       columnWidths: columnWidths,
@@ -218,8 +229,10 @@ class ChildTableWidget<C> extends StatelessWidget {
       
       // Thử sử dụng dynamic access
       final dynamic value = (item as dynamic)[columnKey];
+      print('_getDefaultValue for $columnKey: $value');
       return value?.toString() ?? '';
     } catch (e) {
+      print('_getDefaultValue error for $columnKey: $e');
       return '';
     }
   }
