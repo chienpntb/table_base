@@ -92,6 +92,7 @@ class ExpandableTableExample extends ConsumerWidget {
                 columns: _getParentColumns(),
                 valueGetter: _getValue,
                 cellBuilderByKey: _buildCellByKey,
+                childCellBuilder: _buildChildCellByKey, // Thêm cell builder cho child
                 childTableTitle: 'Dessert Details',
                 childTableBackgroundColor: Colors.yellow.shade50,
                 childTableMaxHeight: 200,
@@ -250,13 +251,6 @@ class ExpandableTableExample extends ConsumerWidget {
                 item.name,
                 style: const TextStyle(fontWeight: FontWeight.bold),
               ),
-              Text(
-                item.email,
-                style: TextStyle(
-                  fontSize: 12,
-                  color: Colors.grey.shade600,
-                ),
-              ),
             ],
           ),
         );
@@ -313,6 +307,119 @@ class ExpandableTableExample extends ConsumerWidget {
       default:
         return null;
     }
+  }
+
+  /// Tạo cell cho child table theo key
+  TableCellData? _buildChildCellByKey(Dessert dessert, String key) {
+    switch (key) {
+      case 'name':
+        return TableCellData(
+          widget: Text(
+            dessert.name,
+            style: const TextStyle(fontWeight: FontWeight.w500, fontSize: 12),
+          ),
+        );
+      case 'commits':
+        return TableCellData(
+          widget: Text(
+            dessert.commits.toStringAsFixed(1),
+            style: const TextStyle(fontSize: 12),
+          ),
+        );
+      case 'tasks':
+        return TableCellData(
+          widget: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+            decoration: BoxDecoration(
+              color: _getTasksColor(dessert.tasks),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Text(
+              dessert.tasks.toString(),
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 11,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ),
+        );
+      case 'projects':
+        return TableCellData(
+          widget: Row(
+            children: [
+              Icon(
+                Icons.folder,
+                size: 14,
+                color: Colors.blue.shade600,
+              ),
+              const SizedBox(width: 4),
+              Text(
+                dessert.projects.toString(),
+                style: const TextStyle(fontSize: 12),
+              ),
+            ],
+          ),
+        );
+      case 'hours':
+        return TableCellData(
+          widget: Text(
+            '${(dessert.hours / 1000).toStringAsFixed(1)}k',
+            style: const TextStyle(fontSize: 12),
+          ),
+        );
+      case 'wins':
+        return TableCellData(
+          widget: Row(
+            children: [
+              Icon(
+                Icons.emoji_events,
+                size: 14,
+                color: Colors.amber.shade600,
+              ),
+              const SizedBox(width: 4),
+              Text(
+                dessert.wins.toStringAsFixed(1),
+                style: const TextStyle(fontSize: 12),
+              ),
+            ],
+          ),
+        );
+      case 'score':
+        return TableCellData(
+          widget: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+            decoration: BoxDecoration(
+              color: _getScoreColor(dessert.score),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Text(
+              dessert.score.toStringAsFixed(1),
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 11,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ),
+        );
+      default:
+        return null;
+    }
+  }
+
+  /// Lấy màu cho tasks
+  Color _getTasksColor(int tasks) {
+    if (tasks >= 30) return Colors.green;
+    if (tasks >= 20) return Colors.orange;
+    return Colors.red;
+  }
+
+  /// Lấy màu cho score
+  Color _getScoreColor(double score) {
+    if (score >= 80) return Colors.green;
+    if (score >= 50) return Colors.orange;
+    return Colors.red;
   }
 
   /// Lấy màu theo status

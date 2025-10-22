@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:table_base/core/themes/app_color.dart';
 import 'package:table_base/widgets/table/models/table_model.dart';
 import 'package:table_base/widgets/table/models/expandable_table_model.dart';
 import 'package:table_base/widgets/table/widgets/child_table_widget.dart';
+import 'package:table_base/widgets/table/widgets/pagination_bar.dart';
+import 'package:table_base/widgets/table/widgets/table_actions_widget.dart';
+import 'package:table_base/widgets/table/widgets/table_header_widget.dart';
+import 'package:table_base/widgets/table/widgets/flexible_table.dart';
 import 'package:table_base/widgets/table/providers/table_state.dart';
 import 'package:table_base/widgets/table/providers/table_notifier_interface.dart';
 
@@ -105,7 +108,7 @@ class ExpandableRiverpodTable<T, C> extends ConsumerStatefulWidget {
   final double actionsColumnWidth;
   
   /// Danh sách các nút hành động tùy chỉnh trong cột actions
-  final List<dynamic>? customActions;
+  final List<CustomAction<T>>? customActions;
   
   /// Màu nền cho table con
   final Color? childTableBackgroundColor;
@@ -164,53 +167,203 @@ class ExpandableRiverpodTable<T, C> extends ConsumerStatefulWidget {
       _ExpandableRiverpodTableState<T, C>();
 }
 
-class _ExpandableRiverpodTableState<T, C> extends ConsumerState<ExpandableRiverpodTable<T, C>> {
+class _ExpandableRiverpodTableState<T, C> extends ConsumerState<ExpandableRiverpodTable<T, C>> 
+    with AutomaticKeepAliveClientMixin {
+  @override
+  bool get wantKeepAlive => true;
   /// Set các row đang được expand
   final Set<String> _expandedRows = <String>{};
   
-  // Map lưu trữ dữ liệu con đã load (có thể sử dụng trong tương lai)
-  // final Map<String, List<C>> _cachedChildData = {};
+  /// Key để preserve FlexibleTable state
+  final GlobalKey _flexibleTableKey = GlobalKey();
+  
+  final ScrollController _headerController = ScrollController();
+  final ScrollController _bodyController = ScrollController();
+  final ScrollController _scrollbarController = ScrollController();
+  final ScrollController verticalScrollController = ScrollController();
+
+  /// Danh sách cấu hình các cột (bao gồm cả cột checkbox nếu có)
+  List<TableColumnData> _columns = [];
+
+  /// Biến quản lý resize cột
+  int _resizingColumnIndex = -1;
+  double _startDragX = 0;
+  double _initialColumnWidth = 0;
+  String? _resizingColumnKey;
+
+  /// Biến quản lý hover giữa các cột
+  int _hoveredColumnIndex = -1;
+
+  /// Biến theo dõi trạng thái đang resize cột
+  bool _isResizing = false;
+
+  /// Biến lưu trữ độ rộng preview trong quá trình resize
+  double _previewWidth = 0;
+
+  bool _syncing = false;
+
+  double _maxWidth = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _initializeColumns();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      // Widget đã được render
+    });
+    _onInitListener();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Có thể cần tính toán lại khi dependencies thay đổi
+  }
+
+  @override
+  void didUpdateWidget(covariant ExpandableRiverpodTable<T, C> oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    final oldKeys = oldWidget.columns.map((c) => c.key).toList(growable: false);
+    final newKeys = widget.columns.map((c) => c.key).toList(growable: false);
+    final columnsChanged = oldKeys.length != newKeys.length ||
+        oldKeys.asMap().entries.any((e) => e.value != newKeys[e.key]);
+    final checkboxChanged = oldWidget.showCheckboxColumn != widget.showCheckboxColumn;
+    final actionsChanged = oldWidget.showActionsColumn != widget.showActionsColumn;
+
+    if (columnsChanged || checkboxChanged || actionsChanged) {
+      _initializeColumns();
+    }
+  }
+
+  /// Khởi tạo danh sách cột theo cấu hình và thêm các cột đặc biệt
+  void _initializeColumns() {
+    _columns = [];
+
+    // Thêm cột expand/collapse đầu tiên
+    _columns.add(TableColumnData(
+      name: '',
+      key: 'expand',
+      width: 40,
+      isResizable: false,
+      isSortable: false,
+      isFilterable: false,
+    ));
+
+    // Thêm cột checkbox nếu cần
+    if (widget.showCheckboxColumn) {
+      _columns.add(TableColumnData(
+        name: '',
+        key: 'checkbox',
+        width: 50,
+        isResizable: false,
+        isSortable: false,
+        isFilterable: false,
+      ));
+    }
+
+    // Thêm các cột từ widget.columns
+    _columns.addAll(widget.columns);
+
+    // Thêm cột actions nếu cần
+    if (widget.showActionsColumn) {
+      _columns.add(TableColumnData(
+        name: 'Actions',
+        key: 'actions',
+        width: widget.actionsColumnWidth,
+        isResizable: false,
+        isSortable: false,
+        isFilterable: false,
+      ));
+    }
+  }
+
+  @override
+  void dispose() {
+    _headerController.dispose();
+    _bodyController.dispose();
+    _scrollbarController.dispose();
+    verticalScrollController.dispose();
+    super.dispose();
+  }
+
+  void _syncControllers(ScrollController source, List<ScrollController> targets) {
+    source.addListener(() {
+      if (_syncing) return;
+      _syncing = true;
+      for (final target in targets) {
+        if (target.hasClients && target.offset != source.offset) {
+          target.jumpTo(source.offset);
+        }
+      }
+      _syncing = false;
+    });
+  }
+
+  /// Thiết lập các listener để đồng bộ hóa scroll ngang giữa header và nội dung
+  void _onInitListener() {
+    _syncControllers(_headerController, [_bodyController, _scrollbarController]);
+    _syncControllers(_bodyController, [_headerController, _scrollbarController]);
+    _syncControllers(_scrollbarController, [_headerController, _bodyController]);
+  }
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      children: [
-        // Header table với scroll
-        SingleChildScrollView(
-          scrollDirection: Axis.horizontal,
-          child: Container(
-            height: widget.headerHeight,
-            color: widget.headerColor ?? AppColor.greenLight,
-            child: Row(
-              children: widget.columns.map((column) {
-                return Container(
-                  width: column.width,
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                  decoration: BoxDecoration(
-                    border: Border.all(color: Colors.grey.shade300),
-                  ),
-                  child: Text(
-                    column.name,
-                    style: TextStyle(
-                      color: widget.textHeaderColor,
-                      fontWeight: FontWeight.bold,
-                      fontSize: 14,
-                    ),
-                  ),
-                );
-              }).toList(),
-            ),
-          ),
-        ),
-        // Content table với expandable rows
-        Expanded(
-          child: _buildExpandableTableContent(),
-        ),
-      ],
+    super.build(context); // Required for AutomaticKeepAliveClientMixin
+    
+    final tableState = ref.watch(widget.tableProvider);
+    final providerWidths = tableState.columnsState.widths;
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        _maxWidth = constraints.maxWidth;
+        final computedWidths = _computeColumnWidths(_maxWidth, providerWidths);
+        
+        return Column(
+          children: [
+            // Header
+            _buildTableHeader(computedWidths),
+            // Content
+            Expanded(child: _buildTableContent(computedWidths)),
+            // Pagination (if needed)
+            if (tableState.paginationState.totalPages > 1)
+              PaginationBar<T>(tableProvider: widget.tableProvider),
+            // Preview line for column resize
+            if (_isResizing) _buildPreviewLine(),
+          ],
+        );
+      },
     );
   }
 
-  Widget _buildExpandableTableContent() {
+  /// Xây dựng header cho table
+  Widget _buildTableHeader(Map<String, double> computedWidths) {
+    return TableHeaderWidget<T>(
+      columns: _columns,
+      computedWidths: computedWidths,
+      tableProvider: widget.tableProvider,
+      headerController: _headerController,
+      headerHeight: widget.headerHeight,
+      headerColor: widget.headerColor,
+      textHeaderColor: widget.textHeaderColor,
+      enableColumnResize: widget.enableColumnResize,
+      showCheckboxColumn: widget.showCheckboxColumn,
+      showActionsColumn: widget.showActionsColumn,
+      actionsColumnWidth: widget.actionsColumnWidth,
+      showPageSizeFilter: widget.showPageSizeFilter,
+      onSort: _handleSort,
+      onShowFilterMenu: _showFilterMenu,
+      onColumnHover: (index) => setState(() => _hoveredColumnIndex = index),
+      onColumnHoverExit: () => setState(() => _hoveredColumnIndex = -1),
+      hoveredColumnIndex: _hoveredColumnIndex,
+      isResizing: _isResizing,
+      onStartResizing: _startResizing,
+      onUpdatePreviewWidth: _updatePreviewWidth,
+      onFinishResizing: _finishResizing,
+    );
+  }
+
+  /// Xây dựng nội dung table với expandable rows
+  Widget _buildTableContent(Map<String, double> computedWidths) {
     final tableState = ref.watch(widget.tableProvider);
     
     if (tableState.isLoading && tableState.currentPageData.isEmpty) {
@@ -221,84 +374,156 @@ class _ExpandableRiverpodTableState<T, C> extends ConsumerState<ExpandableRiverp
       return widget.emptyWidget ?? const Center(child: Text('Không có dữ liệu'));
     }
 
-    return SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
+    // Tạo dữ liệu expandable table
+    final expandableTableData = _createExpandableTableData(computedWidths);
+
+    return ConstrainedBox(
+      constraints: BoxConstraints(
+        maxHeight: widget.maxHeight ?? widget.showQuantityColumn * widget.rowHeight,
+        minHeight: 0,
+      ),
       child: SingleChildScrollView(
+        key: const PageStorageKey('expandable_table_vertical_scroll'),
         scrollDirection: Axis.vertical,
-        child: Column(
-          children: tableState.currentPageData.map((item) {
-            return _buildExpandableRow(item);
-          }).toList(),
+        controller: verticalScrollController,
+        child: SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          controller: _bodyController,
+          child: RepaintBoundary(
+            child: FlexibleTable(
+              key: _flexibleTableKey,
+              data: expandableTableData,
+              cellPadding: widget.cellPadding ?? const EdgeInsets.all(12.0),
+              cellDecoration: widget.cellDecoration ?? const BoxDecoration(color: Colors.white),
+              enableRowHover: widget.enableRowHover,
+              hoverColor: widget.hoverColor ?? Colors.blue.shade50,
+              selectedRowColor: widget.selectedRowColor ?? Colors.blue.shade50,
+              onRowTap: widget.enableRowSelection ? (index) => _handleRowTap(index) : null,
+            ),
+          ),
         ),
       ),
     );
   }
 
-  Widget _buildExpandableRow(T item) {
-    final itemId = _getItemId(item);
-    final isExpanded = _expandedRows.contains(itemId);
-    final childData = widget.childDataGetter(item);
-    final hasChildren = childData != null && childData.isNotEmpty;
+  /// Tạo dữ liệu cho expandable table
+  TableData _createExpandableTableData(Map<String, double> computedWidths) {
+    final tableState = ref.watch(widget.tableProvider);
+    final rows = <TableRowData>[];
 
-    return Column(
-      children: [
-        // Parent row
-        Container(
-          height: widget.rowHeight,
-          decoration: BoxDecoration(
-            color: isExpanded ? Colors.yellow.shade50 : Colors.white,
-            border: Border.all(color: Colors.grey.shade300),
-          ),
-          child: Row(
-            children: [
-              // Expand/collapse button
-              if (hasChildren)
-                SizedBox(
-                  width: 40,
-                  child: IconButton(
-                    icon: Icon(
-                      isExpanded ? Icons.keyboard_arrow_up : Icons.keyboard_arrow_down,
-                      size: 20,
-                    ),
-                    onPressed: () => _toggleExpand(itemId),
-                  ),
-                )
-              else
-                const SizedBox(width: 40),
-              
-              // Data cells
-              ...widget.columns.map((column) {
-                return Container(
-                  width: column.width,
-                  padding: widget.cellPadding ?? const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                  decoration: widget.cellDecoration,
-                  child: _buildCellContent(item, column),
-                );
-              }).toList(),
-            ],
-          ),
-        ),
+    for (int itemIndex = 0; itemIndex < tableState.currentPageData.length; itemIndex++) {
+      final item = tableState.currentPageData[itemIndex];
+      final itemId = _getItemId(item);
+      final isExpanded = _expandedRows.contains(itemId);
+      final childData = widget.childDataGetter(item);
+      final hasChildren = childData != null && childData.isNotEmpty;
+
+      // Tạo parent row
+      final parentRowCells = <TableCellData?>[];
+
+      for (int colIndex = 0; colIndex < _columns.length; colIndex++) {
+        final column = _columns[colIndex];
         
-        // Child table (nếu đang expand)
-        if (isExpanded && hasChildren)
-          _buildChildTable(item, childData),
-      ],
+        if (column.key == 'expand') {
+          // Cột expand/collapse
+          parentRowCells.add(TableCellData(
+            widget: hasChildren 
+              ? IconButton(
+                  icon: Icon(
+                    isExpanded ? Icons.keyboard_arrow_up : Icons.keyboard_arrow_down,
+                    size: 20,
+                  ),
+                  onPressed: () => _toggleExpand(itemId),
+                )
+              : const SizedBox(width: 40),
+          ));
+        } else if (column.key == 'checkbox' && widget.showCheckboxColumn) {
+          // Cột checkbox
+          final isSelected = tableState.selectionState.selectedIds.contains(itemId);
+          parentRowCells.add(TableCellData(
+            widget: Checkbox(
+              value: isSelected,
+              onChanged: (_) => ref.read(widget.tableProvider.notifier).toggleItemSelection(itemId),
+            ),
+          ));
+        } else if (column.key == 'actions' && widget.showActionsColumn) {
+          // Cột actions
+          parentRowCells.add(TableCellData(
+            widget: TableActionsWidget<T>(
+              item: item,
+              onEdit: widget.onEdit,
+              onDelete: widget.onDelete,
+              customActions: widget.customActions,
+            ),
+          ));
+        } else {
+          // Cột dữ liệu thông thường
+          final cellData = _buildCellContent(item, column);
+          parentRowCells.add(cellData);
+        }
+      }
+
+      // Thêm parent row
+      rows.add(TableRowData(
+        cells: parentRowCells,
+        height: widget.rowHeight,
+        isSelected: tableState.selectionState.selectedIds.contains(itemId),
+      ));
+
+      // Thêm child table nếu đang expand
+      if (isExpanded && hasChildren) {
+        final childTableWidget = Container(
+          key: ValueKey('child_$itemId'), // Key để preserve state
+          child: _buildChildTable(item, childData),
+        );
+        final childRowCells = <TableCellData?>[];
+        
+        // Tạo cell colspan cho toàn bộ row
+        childRowCells.add(TableCellData(
+          widget: childTableWidget,
+          colSpan: _columns.length,
+        ));
+        
+        // Thêm các cell null cho các cột còn lại (cần đủ số cột)
+        for (int i = 1; i < _columns.length; i++) {
+          childRowCells.add(null);
+        }
+
+        rows.add(TableRowData(
+          cells: childRowCells,
+          height: null, // Để child table tự xác định chiều cao
+        ));
+      }
+    }
+
+    // Tính column widths
+    final columnWidths = <double>[];
+    for (final column in _columns) {
+      columnWidths.add(computedWidths[column.key] ?? column.width);
+    }
+
+    return TableData(
+      rows: rows,
+      columnWidths: columnWidths,
+      showAlternatingRowColors: widget.showAlternatingRowColors,
+      alternateColor: widget.alternateColor,
     );
   }
 
-  Widget _buildCellContent(T item, TableColumnData column) {
+  /// Tạo nội dung cell cho một column
+  TableCellData? _buildCellContent(T item, TableColumnData column) {
     if (widget.cellBuilderByKey != null) {
       final customCell = widget.cellBuilderByKey!(item, column.key);
       if (customCell != null) {
-        return customCell.widget;
+        return customCell;
       }
     }
 
     if (widget.cellsBuilder != null) {
       final cells = widget.cellsBuilder!(item);
-      final columnIndex = widget.columns.indexOf(column);
-      if (columnIndex < cells.length && cells[columnIndex] != null) {
-        return cells[columnIndex]!.widget;
+      final originalColumnIndex = widget.columns.indexWhere((c) => c.key == column.key);
+      if (originalColumnIndex >= 0 && originalColumnIndex < cells.length && cells[originalColumnIndex] != null) {
+        return cells[originalColumnIndex];
       }
     }
 
@@ -306,15 +531,20 @@ class _ExpandableRiverpodTableState<T, C> extends ConsumerState<ExpandableRiverp
     try {
       final dynamic itemObj = item;
       final dynamic value = (itemObj as dynamic)[column.key];
-      return Text(
-        value?.toString() ?? '',
-        style: const TextStyle(fontSize: 14),
+      return TableCellData(
+        widget: Text(
+          value?.toString() ?? '',
+          style: const TextStyle(fontSize: 14),
+        ),
       );
     } catch (e) {
-      return const Text('', style: TextStyle(fontSize: 14));
+      return TableCellData(
+        widget: const Text('', style: TextStyle(fontSize: 14)),
+      );
     }
   }
 
+  /// Xây dựng child table
   Widget _buildChildTable(T parentItem, List<C> childData) {
     return ChildTableWidget<C>(
       childData: childData,
@@ -324,10 +554,93 @@ class _ExpandableRiverpodTableState<T, C> extends ConsumerState<ExpandableRiverp
       maxHeight: widget.childTableMaxHeight,
       backgroundColor: widget.childTableBackgroundColor,
       childCellBuilder: widget.childCellBuilder,
+      borderColor: widget.borderColor,
+      borderWidth: widget.borderWidth,
+      rowHeight: widget.rowHeight * 0.8, // Slightly smaller for child table
+      cellPadding: widget.cellPadding ?? const EdgeInsets.all(8),
     );
   }
 
+  /// Tính toán độ rộng cột
+  Map<String, double> _computeColumnWidths(double maxWidth, Map<String, double> providerWidths) {
+    final computedWidths = <String, double>{};
+    
+    // Nếu có widths từ provider và không có resize, sử dụng chúng
+    if (providerWidths.isNotEmpty && !_isResizing) {
+      for (final column in _columns) {
+        computedWidths[column.key] = providerWidths[column.key] ?? column.width;
+      }
+      return computedWidths;
+    }
+
+    // Tính toán width cho từng cột
+    double totalFixedWidth = 0;
+    double totalFlex = 0;
+    
+    for (final column in _columns) {
+      if (column.flex > 0) {
+        totalFlex += column.flex;
+      } else {
+        totalFixedWidth += column.width;
+        computedWidths[column.key] = column.width;
+      }
+    }
+
+    // Phân phối không gian cho các cột flex
+    if (totalFlex > 0) {
+      final remainingWidth = maxWidth - totalFixedWidth;
+      if (remainingWidth > 0) {
+        for (final column in _columns) {
+          if (column.flex > 0) {
+            computedWidths[column.key] = (remainingWidth * column.flex / totalFlex);
+          }
+        }
+      }
+    }
+
+    return computedWidths;
+  }
+
+  /// Đường kẻ preview thể hiện vị trí resize cột
+  Widget _buildPreviewLine() {
+    double lineX = 0;
+    for (int i = 0; i < _resizingColumnIndex; i++) {
+      final column = _columns[i];
+      final tableState = ref.watch(widget.tableProvider);
+      lineX += tableState.columnsState.widths[column.key] ?? column.width;
+    }
+    lineX += _previewWidth;
+
+    return Positioned(
+      left: lineX,
+      top: 0,
+      bottom: 0,
+      width: 2,
+      child: Container(
+        color: Colors.blue.shade300,
+      ),
+    );
+  }
+
+  /// Xử lý sự kiện sắp xếp
+  void _handleSort(int columnIndex) {
+    if (columnIndex < _columns.length && _columns[columnIndex].isSortable) {
+      ref.read(widget.tableProvider.notifier).sort(columnIndex);
+    }
+  }
+
+  /// Hiển thị menu lọc
+  Future<void> _showFilterMenu(String columnName, int columnIndex, Offset tapPosition) async {
+    // Implementation tương tự như trong RiverpodTable
+    // Có thể implement sau nếu cần
+  }
+
+  /// Toggle expand/collapse row với smooth animation
   void _toggleExpand(String itemId) {
+    // Lưu scroll position trước khi thay đổi
+    final scrollOffset = verticalScrollController.hasClients ? verticalScrollController.offset : 0.0;
+    
+    // Sử dụng debounce để tránh multiple calls
     setState(() {
       if (_expandedRows.contains(itemId)) {
         _expandedRows.remove(itemId);
@@ -335,8 +648,25 @@ class _ExpandableRiverpodTableState<T, C> extends ConsumerState<ExpandableRiverp
         _expandedRows.add(itemId);
       }
     });
+    
+    // Đợi một frame rồi mới restore position
+    Future.delayed(const Duration(milliseconds: 50), () {
+      if (mounted && verticalScrollController.hasClients) {
+        final newMaxScrollExtent = verticalScrollController.position.maxScrollExtent;
+        final targetOffset = scrollOffset.clamp(0.0, newMaxScrollExtent);
+        
+        if ((verticalScrollController.offset - targetOffset).abs() > 1.0) {
+          verticalScrollController.animateTo(
+            targetOffset,
+            duration: const Duration(milliseconds: 200),
+            curve: Curves.easeInOut,
+          );
+        }
+      }
+    });
   }
 
+  /// Lấy ID của item
   String _getItemId(T item) {
     if (widget.idGetter != null) {
       return widget.idGetter!(item)?.toString() ?? '';
@@ -348,5 +678,52 @@ class _ExpandableRiverpodTableState<T, C> extends ConsumerState<ExpandableRiverp
     } catch (e) {
       return item.hashCode.toString();
     }
+  }
+
+  /// Xử lý khi click vào row
+  void _handleRowTap(int rowIndex) {
+    final tableState = ref.read(widget.tableProvider);
+    if (widget.onRowTap != null && rowIndex < tableState.currentPageData.length) {
+      widget.onRowTap!(tableState.currentPageData[rowIndex]);
+    }
+  }
+
+  /// Resize column methods
+  void _startResizing(int columnIndex, double startX) {
+    if (columnIndex >= _columns.length) return;
+    
+    setState(() {
+      _resizingColumnIndex = columnIndex;
+      _startDragX = startX;
+      _resizingColumnKey = _columns[columnIndex].key;
+      _initialColumnWidth = ref.read(widget.tableProvider).columnsState.widths[_resizingColumnKey] ?? _columns[columnIndex].width;
+      _isResizing = true;
+      _previewWidth = _initialColumnWidth;
+    });
+  }
+
+  void _updatePreviewWidth(double currentX) {
+    if (!_isResizing || _resizingColumnIndex == -1) return;
+    
+    final deltaX = currentX - _startDragX;
+    final newWidth = (_initialColumnWidth + deltaX).clamp(50.0, double.infinity);
+    
+    setState(() {
+      _previewWidth = newWidth;
+    });
+  }
+
+  void _finishResizing() {
+    if (!_isResizing || _resizingColumnIndex == -1 || _resizingColumnKey == null) return;
+
+    final newWidth = _previewWidth;
+    ref.read(widget.tableProvider.notifier).resizeColumn(_resizingColumnKey!, newWidth);
+
+    setState(() {
+      _isResizing = false;
+      _resizingColumnIndex = -1;
+      _resizingColumnKey = null;
+      _previewWidth = 0;
+    });
   }
 }

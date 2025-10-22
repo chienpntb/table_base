@@ -41,6 +41,7 @@ class ChildTableWidget<C> extends StatelessWidget {
     }
 
     return Container(
+      width: double.infinity, // Đảm bảo container chiếm full width
       margin: padding ?? const EdgeInsets.only(left: 20, top: 4, bottom: 4),
       decoration: BoxDecoration(
         color: backgroundColor ?? Colors.yellow.shade50,
@@ -51,10 +52,10 @@ class ChildTableWidget<C> extends StatelessWidget {
         borderRadius: BorderRadius.circular(4),
       ),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.stretch, // Đảm bảo children chiếm full width
         children: [
           if (title != null) _buildTitle(),
-          _buildChildTable(),
+          _buildChildTable(), // Sử dụng Flexible cho child table
         ],
       ),
     );
@@ -62,6 +63,7 @@ class ChildTableWidget<C> extends StatelessWidget {
 
   Widget _buildTitle() {
     return Container(
+      width: double.infinity, // Chiếm toàn bộ width có sẵn
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       decoration: BoxDecoration(
         color: Colors.yellow.shade100,
@@ -76,6 +78,8 @@ class ChildTableWidget<C> extends StatelessWidget {
           fontWeight: FontWeight.bold,
           fontSize: 14,
         ),
+        overflow: TextOverflow.ellipsis, // Cắt text nếu quá dài
+        maxLines: 1, // Chỉ hiển thị 1 dòng
       ),
     );
   }
@@ -106,6 +110,24 @@ class ChildTableWidget<C> extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  /// Tính tổng width của child table
+  double _calculateTotalWidth(List<AlignedColumn> alignedColumns) {
+    double totalWidth = 0;
+    for (int i = 0; i < childColumns.length; i++) {
+      double columnWidth = 120.0; // Default width
+      
+      if (i < parentColumns.length) {
+        // Sử dụng width từ parent nhưng đảm bảo tối thiểu
+        columnWidth = parentColumns[i].width > 0 ? parentColumns[i].width : 120.0;
+      }
+      
+      totalWidth += columnWidth;
+    }
+    
+    // Đảm bảo width tối thiểu 300px
+    return totalWidth < 300 ? 300 : totalWidth;
   }
 
   /// Tính toán alignment của columns giữa parent và child table
@@ -190,14 +212,18 @@ class ChildTableWidget<C> extends StatelessWidget {
       ));
     }
     
-    // Tính column widths dựa trên parent columns
+    // Tính column widths dựa trên parent columns với width tối thiểu
     final columnWidths = <double>[];
     for (int i = 0; i < childColumns.length; i++) {
+      double columnWidth = 120.0; // Default width
+      
       if (i < parentColumns.length) {
-        columnWidths.add(parentColumns[i].width);
-      } else {
-        columnWidths.add(120.0); // Default width
+        // Sử dụng width từ parent nhưng đảm bảo tối thiểu 120px
+        columnWidth = parentColumns[i].width > 0 ? parentColumns[i].width : 120.0;
+        columnWidth = columnWidth < 120.0 ? 120.0 : columnWidth;
       }
+      
+      columnWidths.add(columnWidth);
     }
     
     return TableData(
