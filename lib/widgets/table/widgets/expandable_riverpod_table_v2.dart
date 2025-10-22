@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:table_base/widgets/table/widgets/child_table_widget.dart';
 import 'package:table_base/widgets/table/widgets/table_actions_widget.dart';
 import '../models/table_model.dart';
 import '../models/expandable_table_model.dart';
@@ -315,7 +316,7 @@ class _ExpandableRiverpodTableV2State<T, C> extends ConsumerState<ExpandableRive
     _columns.add(TableColumnData(
       name: '',
       key: 'expand',
-      width: 40,
+      width: 60,
       isResizable: false,
       isSortable: false,
       isFilterable: false,
@@ -507,28 +508,23 @@ class _ExpandableRiverpodTableV2State<T, C> extends ConsumerState<ExpandableRive
             margin: const EdgeInsets.only(left: 40),
             child: Column(
               children: [
-                for (final childItem in childData)
-                  Container(
-                    height: widget.rowHeight * 0.8,
-                    decoration: BoxDecoration(
-                      color: Colors.blue.shade50,
-                      border: Border.all(color: Colors.grey.shade200),
-                    ),
-                    child: Row(
-                      children: [
-                        for (int i = 1; i < _columns.length; i++) ...[
-                          Container(
-                            width: _lastComputedWidths[_columns[i].key] ?? _columns[i].width,
-                            padding: const EdgeInsets.all(6),
-                            child: Text(
-                              'Child: ${childItem.toString()}',
-                              style: const TextStyle(fontSize: 12),
-                            ),
-                          ),
-                        ],
-                      ],
-                    ),
-                  ),
+                // Hiển thị widget child table thật sự
+                ChildTableWidget<C>(
+                  childData: childData,
+                  childColumns: widget.childColumns,
+                  parentColumns: widget.columns,
+                  title: widget.childTableTitle,
+                  maxHeight: widget.childTableMaxHeight,
+                  backgroundColor: widget.childTableBackgroundColor ?? Colors.grey.shade50,
+                  parentHeaderColor: widget.headerColor,
+                  rowDividerColor: Colors.grey.shade200,
+                  rowDividerThickness: 0.5,
+                  childCellBuilder: widget.childCellBuilder,
+                  borderColor: Colors.grey.shade200,
+                  borderWidth: 1.0,
+                  rowHeight: widget.rowHeight * 0.8,
+                  cellPadding: widget.cellPadding ?? const EdgeInsets.all(6),
+                ),
               ],
             ),
           ),
@@ -545,7 +541,7 @@ class _ExpandableRiverpodTableV2State<T, C> extends ConsumerState<ExpandableRive
           ? IconButton(
               icon: Icon(
                 isExpanded ? Icons.keyboard_arrow_up : Icons.keyboard_arrow_down,
-                size: 20,
+                size: 24,
               ),
               onPressed: () => _toggleExpand(itemId),
             )

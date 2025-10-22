@@ -49,11 +49,11 @@ class TableActionsWidget<T> extends StatelessWidget {
         onTap: () => onEdit!(item),
         borderRadius: BorderRadius.circular(4),
         child: Container(
-          padding: const EdgeInsets.all(8),
+          padding: const EdgeInsets.all(5),
           child: SvgPicture.asset(
             AppIconSvg.iconPencilLine,
-            width: 20,
-            height: 20,
+            width: 24,
+            height: 24,
             colorFilter: const ColorFilter.mode(Colors.blue, BlendMode.srcIn),
           ),
         ),
@@ -72,8 +72,8 @@ class TableActionsWidget<T> extends StatelessWidget {
           padding: const EdgeInsets.all(8),
           child: SvgPicture.asset(
             AppIconSvg.iconTrash2,
-            width: 20,
-            height: 20,
+            width: 24,
+            height: 24,
             colorFilter: const ColorFilter.mode(
               Colors.redAccent,
               BlendMode.srcIn,
@@ -96,8 +96,8 @@ class TableActionsWidget<T> extends StatelessWidget {
             padding: const EdgeInsets.all(8),
             child: SvgPicture.asset(
               action.iconPath,
-              width: 20,
-              height: 20,
+              width: 24,
+              height: 24,
               colorFilter: ColorFilter.mode(
                 action.color ?? Colors.redAccent,
                 BlendMode.srcIn,

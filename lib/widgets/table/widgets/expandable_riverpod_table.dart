@@ -14,76 +14,77 @@ import 'package:table_base/widgets/table/providers/table_notifier_interface.dart
 class ExpandableRiverpodTable<T, C> extends ConsumerStatefulWidget {
   /// Callback để lấy dữ liệu con từ dữ liệu cha
   final ChildDataGetter<T, C> childDataGetter;
-  
+
   /// Callback để tạo cell cho dữ liệu con
   final ChildCellBuilder<C>? childCellBuilder;
-  
+
   /// Cấu hình columns cho table con
   final List<TableColumnData> childColumns;
-  
+
   /// Provider để quản lý trạng thái bảng
   final AutoDisposeStateNotifierProvider<
     TableNotifierInterface<T>,
     GenericTableState<T>
-  > tableProvider;
-  
+  >
+  tableProvider;
+
   /// Callback để tạo các ô cho một hàng từ một mục dữ liệu
   final List<TableCellData?> Function(T item)? cellsBuilder;
-  
+
   /// Callback để lấy giá trị từ một mục theo cột
   final dynamic Function(T item, int columnIndex) valueGetter;
-  
+
   /// Callback tạo TableCell theo key cột
   final TableCellData? Function(T item, String key)? cellBuilderByKey;
-  
+
   /// Callback lấy id từ item để chọn/bỏ chọn
   final dynamic Function(T item)? idGetter;
-  
+
   /// Danh sách cấu hình các cột
   final List<TableColumnData> columns;
-  
+
   /// Cho phép chọn hàng khi nhấp vào
   final bool enableRowSelection;
-  
+
   /// Hiển thị hiệu ứng hover khi di chuột qua hàng
   final bool enableRowHover;
-  
+
   /// Hiển thị màu xen kẽ cho các hàng
   final bool showAlternatingRowColors;
-  
+
   /// Hiển thị cột checkbox để chọn nhiều mục
   final bool showCheckboxColumn;
-  
+
   /// Cho phép điều chỉnh kích thước cột
   final bool enableColumnResize;
-  
+
   /// Padding bên trong mỗi ô
   final EdgeInsets? cellPadding;
-  
+
   /// Trang trí cho mỗi ô
   final BoxDecoration? cellDecoration;
-  
+
   /// Màu cho các hàng xen kẽ
   final Color? alternateColor;
-  
+
   /// Màu khi hover lên hàng
   final Color? hoverColor;
-  
+
   /// Màu khi chọn hàng
   final Color? selectedRowColor;
-  
+
   /// Màu cho header
   final Color? headerColor;
-  
+
   /// Màu text cho header
   final Color textHeaderColor;
-  
+
   /// Widget hiển thị khi có lỗi
   final Widget? errorWidget;
-  
+
   /// Widget hiển thị khi không có dữ liệu
   final Widget? emptyWidget;
-  
+
   final Color borderColor;
   final double borderWidth;
   final int showQuantityColumn;
@@ -91,31 +92,31 @@ class ExpandableRiverpodTable<T, C> extends ConsumerStatefulWidget {
   final int showPageSizeFilter;
   final double rowHeight;
   final double headerHeight;
-  
+
   /// Callback khi một hàng được nhấp vào
   final void Function(T)? onRowTap;
-  
+
   /// Callback khi nhấn nút sửa cho một item
   final void Function(T)? onEdit;
-  
+
   /// Callback khi nhấn nút xóa cho một item
   final void Function(T)? onDelete;
-  
+
   /// Hiển thị cột actions với các nút thêm, sửa, xóa
   final bool showActionsColumn;
-  
+
   /// Chiều rộng của cột actions
   final double actionsColumnWidth;
-  
+
   /// Danh sách các nút hành động tùy chỉnh trong cột actions
   final List<CustomAction<T>>? customActions;
-  
+
   /// Màu nền cho table con
   final Color? childTableBackgroundColor;
-  
+
   /// Tiêu đề cho table con
   final String? childTableTitle;
-  
+
   /// Chiều cao tối đa cho table con
   final double? childTableMaxHeight;
 
@@ -163,20 +164,22 @@ class ExpandableRiverpodTable<T, C> extends ConsumerStatefulWidget {
   });
 
   @override
-  ConsumerState<ExpandableRiverpodTable<T, C>> createState() => 
+  ConsumerState<ExpandableRiverpodTable<T, C>> createState() =>
       _ExpandableRiverpodTableState<T, C>();
 }
 
-class _ExpandableRiverpodTableState<T, C> extends ConsumerState<ExpandableRiverpodTable<T, C>> 
+class _ExpandableRiverpodTableState<T, C>
+    extends ConsumerState<ExpandableRiverpodTable<T, C>>
     with AutomaticKeepAliveClientMixin {
   @override
   bool get wantKeepAlive => true;
+
   /// Set các row đang được expand
   final Set<String> _expandedRows = <String>{};
-  
+
   /// Key để preserve FlexibleTable state
   final GlobalKey _flexibleTableKey = GlobalKey();
-  
+
   final ScrollController _headerController = ScrollController();
   final ScrollController _bodyController = ScrollController();
   final ScrollController _scrollbarController = ScrollController();
@@ -225,10 +228,13 @@ class _ExpandableRiverpodTableState<T, C> extends ConsumerState<ExpandableRiverp
     super.didUpdateWidget(oldWidget);
     final oldKeys = oldWidget.columns.map((c) => c.key).toList(growable: false);
     final newKeys = widget.columns.map((c) => c.key).toList(growable: false);
-    final columnsChanged = oldKeys.length != newKeys.length ||
+    final columnsChanged =
+        oldKeys.length != newKeys.length ||
         oldKeys.asMap().entries.any((e) => e.value != newKeys[e.key]);
-    final checkboxChanged = oldWidget.showCheckboxColumn != widget.showCheckboxColumn;
-    final actionsChanged = oldWidget.showActionsColumn != widget.showActionsColumn;
+    final checkboxChanged =
+        oldWidget.showCheckboxColumn != widget.showCheckboxColumn;
+    final actionsChanged =
+        oldWidget.showActionsColumn != widget.showActionsColumn;
 
     if (columnsChanged || checkboxChanged || actionsChanged) {
       _initializeColumns();
@@ -240,25 +246,29 @@ class _ExpandableRiverpodTableState<T, C> extends ConsumerState<ExpandableRiverp
     _columns = [];
 
     // Thêm cột expand/collapse đầu tiên
-    _columns.add(TableColumnData(
-      name: '',
-      key: 'expand',
-      width: 40,
-      isResizable: false,
-      isSortable: false,
-      isFilterable: false,
-    ));
-
-    // Thêm cột checkbox nếu cần
-    if (widget.showCheckboxColumn) {
-      _columns.add(TableColumnData(
+    _columns.add(
+      TableColumnData(
         name: '',
-        key: 'checkbox',
-        width: 50,
+        key: 'expand',
+        width: 60,
         isResizable: false,
         isSortable: false,
         isFilterable: false,
-      ));
+      ),
+    );
+
+    // Thêm cột checkbox nếu cần
+    if (widget.showCheckboxColumn) {
+      _columns.add(
+        TableColumnData(
+          name: '',
+          key: 'checkbox',
+          width: 50,
+          isResizable: false,
+          isSortable: false,
+          isFilterable: false,
+        ),
+      );
     }
 
     // Thêm các cột từ widget.columns
@@ -266,14 +276,16 @@ class _ExpandableRiverpodTableState<T, C> extends ConsumerState<ExpandableRiverp
 
     // Thêm cột actions nếu cần
     if (widget.showActionsColumn) {
-      _columns.add(TableColumnData(
-        name: 'Actions',
-        key: 'actions',
-        width: widget.actionsColumnWidth,
-        isResizable: false,
-        isSortable: false,
-        isFilterable: false,
-      ));
+      _columns.add(
+        TableColumnData(
+          name: 'Actions',
+          key: 'actions',
+          width: widget.actionsColumnWidth,
+          isResizable: false,
+          isSortable: false,
+          isFilterable: false,
+        ),
+      );
     }
   }
 
@@ -286,7 +298,10 @@ class _ExpandableRiverpodTableState<T, C> extends ConsumerState<ExpandableRiverp
     super.dispose();
   }
 
-  void _syncControllers(ScrollController source, List<ScrollController> targets) {
+  void _syncControllers(
+    ScrollController source,
+    List<ScrollController> targets,
+  ) {
     source.addListener(() {
       if (_syncing) return;
       _syncing = true;
@@ -301,15 +316,24 @@ class _ExpandableRiverpodTableState<T, C> extends ConsumerState<ExpandableRiverp
 
   /// Thiết lập các listener để đồng bộ hóa scroll ngang giữa header và nội dung
   void _onInitListener() {
-    _syncControllers(_headerController, [_bodyController, _scrollbarController]);
-    _syncControllers(_bodyController, [_headerController, _scrollbarController]);
-    _syncControllers(_scrollbarController, [_headerController, _bodyController]);
+    _syncControllers(_headerController, [
+      _bodyController,
+      _scrollbarController,
+    ]);
+    _syncControllers(_bodyController, [
+      _headerController,
+      _scrollbarController,
+    ]);
+    _syncControllers(_scrollbarController, [
+      _headerController,
+      _bodyController,
+    ]);
   }
 
   @override
   Widget build(BuildContext context) {
     super.build(context); // Required for AutomaticKeepAliveClientMixin
-    
+
     final tableState = ref.watch(widget.tableProvider);
     final providerWidths = tableState.columnsState.widths;
 
@@ -317,7 +341,7 @@ class _ExpandableRiverpodTableState<T, C> extends ConsumerState<ExpandableRiverp
       builder: (context, constraints) {
         _maxWidth = constraints.maxWidth;
         final computedWidths = _computeColumnWidths(_maxWidth, providerWidths);
-        
+
         return Column(
           children: [
             // Header
@@ -365,13 +389,14 @@ class _ExpandableRiverpodTableState<T, C> extends ConsumerState<ExpandableRiverp
   /// Xây dựng nội dung table với expandable rows
   Widget _buildTableContent(Map<String, double> computedWidths) {
     final tableState = ref.watch(widget.tableProvider);
-    
+
     if (tableState.isLoading && tableState.currentPageData.isEmpty) {
       return const Center(child: CircularProgressIndicator());
     }
-    
+
     if (!tableState.isLoading && tableState.currentPageData.isEmpty) {
-      return widget.emptyWidget ?? const Center(child: Text('Không có dữ liệu'));
+      return widget.emptyWidget ??
+          const Center(child: Text('Không có dữ liệu'));
     }
 
     // Tạo dữ liệu expandable table
@@ -379,7 +404,8 @@ class _ExpandableRiverpodTableState<T, C> extends ConsumerState<ExpandableRiverp
 
     return ConstrainedBox(
       constraints: BoxConstraints(
-        maxHeight: widget.maxHeight ?? widget.showQuantityColumn * widget.rowHeight,
+        maxHeight:
+            widget.maxHeight ?? widget.showQuantityColumn * widget.rowHeight,
         minHeight: 0,
       ),
       child: SingleChildScrollView(
@@ -393,12 +419,17 @@ class _ExpandableRiverpodTableState<T, C> extends ConsumerState<ExpandableRiverp
             child: FlexibleTable(
               key: _flexibleTableKey,
               data: expandableTableData,
-              cellPadding: widget.cellPadding ?? const EdgeInsets.all(12.0),
-              cellDecoration: widget.cellDecoration ?? const BoxDecoration(color: Colors.white),
+              cellPadding: widget.cellPadding ?? const EdgeInsets.all(3.0),
+              cellDecoration:
+                  widget.cellDecoration ??
+                  const BoxDecoration(color: Colors.white),
               enableRowHover: widget.enableRowHover,
               hoverColor: widget.hoverColor ?? Colors.blue.shade50,
               selectedRowColor: widget.selectedRowColor ?? Colors.blue.shade50,
-              onRowTap: widget.enableRowSelection ? (index) => _handleRowTap(index) : null,
+              onRowTap:
+                  widget.enableRowSelection
+                      ? (index) => _handleRowTap(index)
+                      : null,
             ),
           ),
         ),
@@ -411,7 +442,11 @@ class _ExpandableRiverpodTableState<T, C> extends ConsumerState<ExpandableRiverp
     final tableState = ref.watch(widget.tableProvider);
     final rows = <TableRowData>[];
 
-    for (int itemIndex = 0; itemIndex < tableState.currentPageData.length; itemIndex++) {
+    for (
+      int itemIndex = 0;
+      itemIndex < tableState.currentPageData.length;
+      itemIndex++
+    ) {
       final item = tableState.currentPageData[itemIndex];
       final itemId = _getItemId(item);
       final isExpanded = _expandedRows.contains(itemId);
@@ -423,39 +458,55 @@ class _ExpandableRiverpodTableState<T, C> extends ConsumerState<ExpandableRiverp
 
       for (int colIndex = 0; colIndex < _columns.length; colIndex++) {
         final column = _columns[colIndex];
-        
-        if (column.key == 'expand') {
-          // Cột expand/collapse
-          parentRowCells.add(TableCellData(
-            widget: hasChildren 
-              ? IconButton(
-                  icon: Icon(
-                    isExpanded ? Icons.keyboard_arrow_up : Icons.keyboard_arrow_down,
-                    size: 20,
-                  ),
-                  onPressed: () => _toggleExpand(itemId),
-                )
-              : const SizedBox(width: 40),
-          ));
-        } else if (column.key == 'checkbox' && widget.showCheckboxColumn) {
+
+        if (column.key == 'checkbox' && widget.showCheckboxColumn) {
           // Cột checkbox
-          final isSelected = tableState.selectionState.selectedIds.contains(itemId);
-          parentRowCells.add(TableCellData(
-            widget: Checkbox(
-              value: isSelected,
-              onChanged: (_) => ref.read(widget.tableProvider.notifier).toggleItemSelection(itemId),
+          final isSelected = tableState.selectionState.selectedIds.contains(
+            itemId,
+          );
+          parentRowCells.add(
+            TableCellData(
+              widget: Checkbox(
+                value: isSelected,
+                onChanged:
+                    (_) => ref
+                        .read(widget.tableProvider.notifier)
+                        .toggleItemSelection(itemId),
+              ),
             ),
-          ));
+          );
+        } else if (column.key == 'expand') {
+          // Cột expand/collapse
+          parentRowCells.add(
+            TableCellData(
+              alignment: Alignment.center,
+              widget:
+                  hasChildren
+                      ? IconButton(
+                        icon: Icon(
+                          isExpanded
+                              ? Icons.keyboard_arrow_up
+                              : Icons.keyboard_arrow_down,
+                          size: 24,
+                        ),
+                        onPressed: () => _toggleExpand(itemId),
+                      )
+                      : const SizedBox(width: 60),
+            ),
+          );
         } else if (column.key == 'actions' && widget.showActionsColumn) {
           // Cột actions
-          parentRowCells.add(TableCellData(
-            widget: TableActionsWidget<T>(
-              item: item,
-              onEdit: widget.onEdit,
-              onDelete: widget.onDelete,
-              customActions: widget.customActions,
+          parentRowCells.add(
+            TableCellData(
+              alignment: Alignment.center,
+              widget: TableActionsWidget<T>(
+                item: item,
+                onEdit: widget.onEdit,
+                onDelete: widget.onDelete,
+                customActions: widget.customActions,
+              ),
             ),
-          ));
+          );
         } else {
           // Cột dữ liệu thông thường
           final cellData = _buildCellContent(item, column);
@@ -464,35 +515,42 @@ class _ExpandableRiverpodTableState<T, C> extends ConsumerState<ExpandableRiverp
       }
 
       // Thêm parent row
-      rows.add(TableRowData(
-        cells: parentRowCells,
-        height: widget.rowHeight,
-        isSelected: tableState.selectionState.selectedIds.contains(itemId),
-      ));
+      rows.add(
+        TableRowData(
+          cells: parentRowCells,
+          height: widget.rowHeight,
+          isSelected: tableState.selectionState.selectedIds.contains(itemId),
+        ),
+      );
 
       // Thêm child table nếu đang expand
       if (isExpanded && hasChildren) {
+        // Tạo một row riêng cho child table với colspan
         final childTableWidget = Container(
-          key: ValueKey('child_$itemId'), // Key để preserve state
+          key: ValueKey('child_$itemId'),
           child: _buildChildTable(item, childData),
         );
+        
+        // Tạo row với colspan để child table chiếm toàn bộ width
         final childRowCells = <TableCellData?>[];
+        childRowCells.add(
+          TableCellData(
+            widget: childTableWidget, 
+            colSpan: _columns.length,
+          ),
+        );
         
-        // Tạo cell colspan cho toàn bộ row
-        childRowCells.add(TableCellData(
-          widget: childTableWidget,
-          colSpan: _columns.length,
-        ));
-        
-        // Thêm các cell null cho các cột còn lại (cần đủ số cột)
+        // Thêm các cell null để đảm bảo đủ số cột
         for (int i = 1; i < _columns.length; i++) {
           childRowCells.add(null);
         }
 
-        rows.add(TableRowData(
-          cells: childRowCells,
-          height: null, // Để child table tự xác định chiều cao
-        ));
+        rows.add(
+          TableRowData(
+            cells: childRowCells,
+            height: null, // Để child table tự xác định chiều cao
+          ),
+        );
       }
     }
 
@@ -521,8 +579,12 @@ class _ExpandableRiverpodTableState<T, C> extends ConsumerState<ExpandableRiverp
 
     if (widget.cellsBuilder != null) {
       final cells = widget.cellsBuilder!(item);
-      final originalColumnIndex = widget.columns.indexWhere((c) => c.key == column.key);
-      if (originalColumnIndex >= 0 && originalColumnIndex < cells.length && cells[originalColumnIndex] != null) {
+      final originalColumnIndex = widget.columns.indexWhere(
+        (c) => c.key == column.key,
+      );
+      if (originalColumnIndex >= 0 &&
+          originalColumnIndex < cells.length &&
+          cells[originalColumnIndex] != null) {
         return cells[originalColumnIndex];
       }
     }
@@ -552,19 +614,25 @@ class _ExpandableRiverpodTableState<T, C> extends ConsumerState<ExpandableRiverp
       parentColumns: widget.columns,
       title: widget.childTableTitle,
       maxHeight: widget.childTableMaxHeight,
-      backgroundColor: widget.childTableBackgroundColor,
+      backgroundColor: widget.childTableBackgroundColor ?? Colors.grey.shade50,
+      parentHeaderColor: widget.headerColor,
+      rowDividerColor: Colors.grey.shade200,
+      rowDividerThickness: 0.5,
       childCellBuilder: widget.childCellBuilder,
-      borderColor: widget.borderColor,
-      borderWidth: widget.borderWidth,
+      borderColor: Colors.grey.shade200,
+      borderWidth: 1.0,
       rowHeight: widget.rowHeight * 0.8, // Slightly smaller for child table
-      cellPadding: widget.cellPadding ?? const EdgeInsets.all(8),
+      cellPadding: widget.cellPadding ?? const EdgeInsets.all(6),
     );
   }
 
   /// Tính toán độ rộng cột
-  Map<String, double> _computeColumnWidths(double maxWidth, Map<String, double> providerWidths) {
+  Map<String, double> _computeColumnWidths(
+    double maxWidth,
+    Map<String, double> providerWidths,
+  ) {
     final computedWidths = <String, double>{};
-    
+
     // Nếu có widths từ provider và không có resize, sử dụng chúng
     if (providerWidths.isNotEmpty && !_isResizing) {
       for (final column in _columns) {
@@ -576,7 +644,7 @@ class _ExpandableRiverpodTableState<T, C> extends ConsumerState<ExpandableRiverp
     // Tính toán width cho từng cột
     double totalFixedWidth = 0;
     double totalFlex = 0;
-    
+
     for (final column in _columns) {
       if (column.flex > 0) {
         totalFlex += column.flex;
@@ -592,7 +660,8 @@ class _ExpandableRiverpodTableState<T, C> extends ConsumerState<ExpandableRiverp
       if (remainingWidth > 0) {
         for (final column in _columns) {
           if (column.flex > 0) {
-            computedWidths[column.key] = (remainingWidth * column.flex / totalFlex);
+            computedWidths[column.key] =
+                (remainingWidth * column.flex / totalFlex);
           }
         }
       }
@@ -616,9 +685,7 @@ class _ExpandableRiverpodTableState<T, C> extends ConsumerState<ExpandableRiverp
       top: 0,
       bottom: 0,
       width: 2,
-      child: Container(
-        color: Colors.blue.shade300,
-      ),
+      child: Container(color: Colors.blue.shade300),
     );
   }
 
@@ -630,7 +697,11 @@ class _ExpandableRiverpodTableState<T, C> extends ConsumerState<ExpandableRiverp
   }
 
   /// Hiển thị menu lọc
-  Future<void> _showFilterMenu(String columnName, int columnIndex, Offset tapPosition) async {
+  Future<void> _showFilterMenu(
+    String columnName,
+    int columnIndex,
+    Offset tapPosition,
+  ) async {
     // Implementation tương tự như trong RiverpodTable
     // Có thể implement sau nếu cần
   }
@@ -638,8 +709,11 @@ class _ExpandableRiverpodTableState<T, C> extends ConsumerState<ExpandableRiverp
   /// Toggle expand/collapse row với smooth animation
   void _toggleExpand(String itemId) {
     // Lưu scroll position trước khi thay đổi
-    final scrollOffset = verticalScrollController.hasClients ? verticalScrollController.offset : 0.0;
-    
+    final scrollOffset =
+        verticalScrollController.hasClients
+            ? verticalScrollController.offset
+            : 0.0;
+
     // Sử dụng debounce để tránh multiple calls
     setState(() {
       if (_expandedRows.contains(itemId)) {
@@ -648,13 +722,14 @@ class _ExpandableRiverpodTableState<T, C> extends ConsumerState<ExpandableRiverp
         _expandedRows.add(itemId);
       }
     });
-    
+
     // Đợi một frame rồi mới restore position
     Future.delayed(const Duration(milliseconds: 50), () {
       if (mounted && verticalScrollController.hasClients) {
-        final newMaxScrollExtent = verticalScrollController.position.maxScrollExtent;
+        final newMaxScrollExtent =
+            verticalScrollController.position.maxScrollExtent;
         final targetOffset = scrollOffset.clamp(0.0, newMaxScrollExtent);
-        
+
         if ((verticalScrollController.offset - targetOffset).abs() > 1.0) {
           verticalScrollController.animateTo(
             targetOffset,
@@ -671,7 +746,7 @@ class _ExpandableRiverpodTableState<T, C> extends ConsumerState<ExpandableRiverp
     if (widget.idGetter != null) {
       return widget.idGetter!(item)?.toString() ?? '';
     }
-    
+
     try {
       final dynamic itemObj = item;
       return (itemObj as dynamic).id?.toString() ?? '';
@@ -683,7 +758,8 @@ class _ExpandableRiverpodTableState<T, C> extends ConsumerState<ExpandableRiverp
   /// Xử lý khi click vào row
   void _handleRowTap(int rowIndex) {
     final tableState = ref.read(widget.tableProvider);
-    if (widget.onRowTap != null && rowIndex < tableState.currentPageData.length) {
+    if (widget.onRowTap != null &&
+        rowIndex < tableState.currentPageData.length) {
       widget.onRowTap!(tableState.currentPageData[rowIndex]);
     }
   }
@@ -691,12 +767,17 @@ class _ExpandableRiverpodTableState<T, C> extends ConsumerState<ExpandableRiverp
   /// Resize column methods
   void _startResizing(int columnIndex, double startX) {
     if (columnIndex >= _columns.length) return;
-    
+
     setState(() {
       _resizingColumnIndex = columnIndex;
       _startDragX = startX;
       _resizingColumnKey = _columns[columnIndex].key;
-      _initialColumnWidth = ref.read(widget.tableProvider).columnsState.widths[_resizingColumnKey] ?? _columns[columnIndex].width;
+      _initialColumnWidth =
+          ref
+              .read(widget.tableProvider)
+              .columnsState
+              .widths[_resizingColumnKey] ??
+          _columns[columnIndex].width;
       _isResizing = true;
       _previewWidth = _initialColumnWidth;
     });
@@ -704,20 +785,28 @@ class _ExpandableRiverpodTableState<T, C> extends ConsumerState<ExpandableRiverp
 
   void _updatePreviewWidth(double currentX) {
     if (!_isResizing || _resizingColumnIndex == -1) return;
-    
+
     final deltaX = currentX - _startDragX;
-    final newWidth = (_initialColumnWidth + deltaX).clamp(50.0, double.infinity);
-    
+    final newWidth = (_initialColumnWidth + deltaX).clamp(
+      50.0,
+      double.infinity,
+    );
+
     setState(() {
       _previewWidth = newWidth;
     });
   }
 
   void _finishResizing() {
-    if (!_isResizing || _resizingColumnIndex == -1 || _resizingColumnKey == null) return;
+    if (!_isResizing ||
+        _resizingColumnIndex == -1 ||
+        _resizingColumnKey == null)
+      return;
 
     final newWidth = _previewWidth;
-    ref.read(widget.tableProvider.notifier).resizeColumn(_resizingColumnKey!, newWidth);
+    ref
+        .read(widget.tableProvider.notifier)
+        .resizeColumn(_resizingColumnKey!, newWidth);
 
     setState(() {
       _isResizing = false;

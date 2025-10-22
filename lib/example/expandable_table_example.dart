@@ -103,7 +103,6 @@ class ExpandableTableExample extends ConsumerWidget {
                 showAlternatingRowColors: true,
                 alternateColor: Colors.grey.shade50,
                 hoverColor: Colors.blue.shade50,
-                selectedRowColor: Colors.blue.shade100,
                 onRowTap: (employee) {
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(content: Text('Selected: ${employee.name}')),

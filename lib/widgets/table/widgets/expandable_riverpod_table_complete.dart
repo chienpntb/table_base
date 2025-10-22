@@ -388,7 +388,7 @@ class _ExpandableRiverpodTableCompleteState<T, C> extends ConsumerState<Expandab
           ? IconButton(
               icon: Icon(
                 isExpanded ? Icons.keyboard_arrow_up : Icons.keyboard_arrow_down,
-                size: 20,
+                size: 24,
               ),
               onPressed: () => _toggleExpand(itemId),
             )
@@ -464,12 +464,15 @@ class _ExpandableRiverpodTableCompleteState<T, C> extends ConsumerState<Expandab
         parentColumns: widget.columns,
         title: widget.childTableTitle,
         maxHeight: widget.childTableMaxHeight,
-        backgroundColor: widget.childTableBackgroundColor,
+        backgroundColor: widget.childTableBackgroundColor ?? Colors.grey.shade50,
+        parentHeaderColor: widget.headerColor,
+        rowDividerColor: Colors.grey.shade200,
+        rowDividerThickness: 0.5,
         childCellBuilder: widget.childCellBuilder,
-        borderColor: widget.borderColor,
-        borderWidth: widget.borderWidth,
+        borderColor: Colors.grey.shade200,
+        borderWidth: 1.0,
         rowHeight: widget.rowHeight * 0.8,
-        cellPadding: widget.cellPadding ?? const EdgeInsets.all(8),
+        cellPadding: widget.cellPadding ?? const EdgeInsets.all(6),
       ),
     );
   }
