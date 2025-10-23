@@ -49,6 +49,15 @@ class TableHeaderWidget<T> extends ConsumerWidget {
   /// Chiều rộng cột actions
   final double actionsColumnWidth;
 
+  /// Hiển thị cột expand/collapse
+  final bool showExpandColumn;
+
+  /// Callback khi click vào cột expand/collapse
+  final VoidCallback? onExpandAllToggle;
+
+  /// Trạng thái expand all
+  final bool isAllExpanded;
+
   /// Số lượng hiển thị tối đa cho filter
   final int showPageSizeFilter;
 
@@ -101,6 +110,9 @@ class TableHeaderWidget<T> extends ConsumerWidget {
     this.showCheckboxColumn = true,
     this.showActionsColumn = false,
     this.actionsColumnWidth = 120,
+    this.showExpandColumn = false,
+    this.onExpandAllToggle,
+    this.isAllExpanded = false,
     this.showPageSizeFilter = 100,
   });
 
@@ -112,33 +124,56 @@ class TableHeaderWidget<T> extends ConsumerWidget {
       child: Container(
         color: headerColor ?? AppColor.greenLight,
         child: Row(
-          children: List.generate(columns.length, (index) {
-            final column = columns[index];
-            final width = computedWidths[column.key] ?? column.width;
-            return TableHeaderCellWidget<T>(
-              column: column,
-              columnIndex: index,
-              width: width,
-              isLastColumn: index == columns.length - 1,
-              tableProvider: tableProvider,
-              headerHeight: headerHeight,
-              textHeaderColor: textHeaderColor,
-              enableColumnResize: enableColumnResize,
-              showCheckboxColumn: showCheckboxColumn,
-              showActionsColumn: showActionsColumn,
-              actionsColumnWidth: actionsColumnWidth,
-              showPageSizeFilter: showPageSizeFilter,
-              onSort: onSort,
-              onShowFilterMenu: onShowFilterMenu,
-              onColumnHover: onColumnHover,
-              onColumnHoverExit: onColumnHoverExit,
-              hoveredColumnIndex: hoveredColumnIndex,
-              isResizing: isResizing,
-              onStartResizing: onStartResizing,
-              onUpdatePreviewWidth: onUpdatePreviewWidth,
-              onFinishResizing: onFinishResizing,
-            );
-          }),
+          children: [
+            // Cột expand/collapse nếu cần
+            if (showExpandColumn)
+              GestureDetector(
+                onTap: onExpandAllToggle,
+                child: Container(
+                  width: 40,
+                  height: headerHeight,
+                  decoration: BoxDecoration(
+                    color: headerColor ?? AppColor.greenLight,
+                    border: Border.all(color: Colors.white, width: 0.5),
+                  ),
+                  child: Center(
+                    child: Icon(
+                      isAllExpanded ? Icons.expand_less : Icons.expand_more,
+                      color: Colors.white,
+                      size: 16,
+                    ),
+                  ),
+                ),
+              ),
+            // Các cột data
+            ...List.generate(columns.length, (index) {
+              final column = columns[index];
+              final width = computedWidths[column.key] ?? column.width;
+              return TableHeaderCellWidget<T>(
+                column: column,
+                columnIndex: index,
+                width: width,
+                isLastColumn: index == columns.length - 1,
+                tableProvider: tableProvider,
+                headerHeight: headerHeight,
+                textHeaderColor: textHeaderColor,
+                enableColumnResize: enableColumnResize,
+                showCheckboxColumn: showCheckboxColumn,
+                showActionsColumn: showActionsColumn,
+                actionsColumnWidth: actionsColumnWidth,
+                showPageSizeFilter: showPageSizeFilter,
+                onSort: onSort,
+                onShowFilterMenu: onShowFilterMenu,
+                onColumnHover: onColumnHover,
+                onColumnHoverExit: onColumnHoverExit,
+                hoveredColumnIndex: hoveredColumnIndex,
+                isResizing: isResizing,
+                onStartResizing: onStartResizing,
+                onUpdatePreviewWidth: onUpdatePreviewWidth,
+                onFinishResizing: onFinishResizing,
+              );
+            }),
+          ],
         ),
       ),
     );

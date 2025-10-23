@@ -1,10 +1,9 @@
 import 'package:flutter/material.dart';
 import '../models/table_model.dart';
 import '../models/expandable_table_model.dart';
-import 'flexible_table.dart';
 
-/// Widget hiển thị table con với column alignment
-class ChildTableWidget<C> extends StatelessWidget {
+/// Widget hiển thị table con với column alignment và resize capability
+class ChildTableWidget<C> extends StatefulWidget {
   final List<C> childData;
   final List<TableColumnData> childColumns;
   final List<TableColumnData> parentColumns;
@@ -17,6 +16,7 @@ class ChildTableWidget<C> extends StatelessWidget {
   final double borderWidth;
   final double rowHeight;
   final EdgeInsets cellPadding;
+  final Map<String, double>? parentColumnWidths;
 
   const ChildTableWidget({
     super.key,
@@ -32,30 +32,75 @@ class ChildTableWidget<C> extends StatelessWidget {
     this.borderWidth = 1.0,
     this.rowHeight = 40.0,
     this.cellPadding = const EdgeInsets.all(8.0),
+    this.parentColumnWidths,
   });
 
   @override
+  State<ChildTableWidget<C>> createState() => _ChildTableWidgetState<C>();
+}
+
+class _ChildTableWidgetState<C> extends State<ChildTableWidget<C>> {
+  Map<String, double> columnWidths = {};
+
+  @override
+  void initState() {
+    super.initState();
+    _initializeColumnWidths();
+  }
+
+  @override
+  void didUpdateWidget(ChildTableWidget<C> oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.parentColumnWidths != oldWidget.parentColumnWidths) {
+      _initializeColumnWidths();
+    }
+  }
+
+  void _initializeColumnWidths() {
+    columnWidths.clear();
+    
+    for (int i = 0; i < widget.childColumns.length; i++) {
+      final column = widget.childColumns[i];
+      
+      // Ưu tiên sử dụng width từ column definition trước
+      // Chỉ fallback về parent column width nếu column.width không được set
+      if (column.width > 0) {
+        // Sử dụng width từ column definition
+        columnWidths[column.key] = column.width;
+      } else if (widget.parentColumnWidths != null && i < widget.parentColumns.length) {
+        // Fallback về parent column width nếu column.width = 0
+        final parentColumn = widget.parentColumns[i];
+        if (widget.parentColumnWidths!.containsKey(parentColumn.key)) {
+          columnWidths[column.key] = widget.parentColumnWidths![parentColumn.key]!;
+        } else {
+          columnWidths[column.key] = column.width;
+        }
+      } else {
+        columnWidths[column.key] = column.width;
+      }
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
-    print('ChildTableWidget build - childData length: ${childData.length}');
-    if (childData.isEmpty) {
-      print('ChildTableWidget - childData is empty, returning SizedBox.shrink()');
+    if (widget.childData.isEmpty) {
       return const SizedBox.shrink();
     }
 
     return Container(
-      margin: padding ?? const EdgeInsets.only(left: 20, top: 4, bottom: 4),
+      margin: widget.padding ?? const EdgeInsets.only(left: 20, top: 4, bottom: 4),
       decoration: BoxDecoration(
-        color: backgroundColor ?? Colors.yellow.shade50,
+        color: widget.backgroundColor ?? Colors.yellow.shade50,
         border: Border.all(
-          color: borderColor ?? Colors.grey.shade300,
-          width: borderWidth,
+          color: widget.borderColor ?? Colors.grey.shade300,
+          width: widget.borderWidth,
         ),
         borderRadius: BorderRadius.circular(4),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          if (title != null) _buildTitle(),
+          if (widget.title != null) _buildTitle(),
           _buildChildTable(),
         ],
       ),
@@ -73,7 +118,7 @@ class ChildTableWidget<C> extends StatelessWidget {
         ),
       ),
       child: Text(
-        title!,
+        widget.title!,
         style: const TextStyle(
           fontWeight: FontWeight.bold,
           fontSize: 14,
@@ -83,105 +128,72 @@ class ChildTableWidget<C> extends StatelessWidget {
   }
 
   Widget _buildChildTable() {
-    // Tính toán column alignment
-    final alignedColumns = _calculateColumnAlignment();
-    
-    // Tạo table data cho child table
-    final childTableData = _createChildTableData(alignedColumns);
-    
     return ConstrainedBox(
       constraints: BoxConstraints(
-        maxHeight: maxHeight ?? 200,
+        maxHeight: widget.maxHeight ?? 200,
         minHeight: 0,
       ),
       child: SingleChildScrollView(
-        child: FlexibleTable(
-          data: childTableData,
-          cellPadding: cellPadding,
-          cellDecoration: BoxDecoration(
-            color: Colors.yellow.shade50,
-            border: Border.all(
-              color: Colors.grey.shade200,
-              width: 0.5,
-            ),
-          ),
+        scrollDirection: Axis.horizontal,
+        child: Table(
+          columnWidths: _buildColumnWidths(),
+          children: _buildTableRows(),
         ),
       ),
     );
   }
 
-  /// Tính toán alignment của columns giữa parent và child table
-  List<AlignedColumn> _calculateColumnAlignment() {
-    final alignedColumns = <AlignedColumn>[];
+  /// Tạo column widths cho child table
+  Map<int, TableColumnWidth> _buildColumnWidths() {
+    final columnWidths = <int, TableColumnWidth>{};
     
-    for (int i = 0; i < childColumns.length; i++) {
-      final childColumn = childColumns[i];
-      
-      // Tìm parent column tương ứng dựa trên vị trí
-      TableColumnData? parentColumn;
-      if (i < parentColumns.length) {
-        parentColumn = parentColumns[i];
-      }
-      
-      alignedColumns.add(AlignedColumn(
-        childColumn: childColumn,
-        parentColumn: parentColumn,
-        alignment: parentColumn != null ? ColumnAlignment.aligned : ColumnAlignment.standalone,
-      ));
+    for (int i = 0; i < widget.childColumns.length; i++) {
+      final column = widget.childColumns[i];
+      final width = this.columnWidths[column.key] ?? column.width;
+      columnWidths[i] = FixedColumnWidth(width);
     }
     
-    return alignedColumns;
+    return columnWidths;
   }
 
-  /// Tạo TableData cho child table
-  TableData _createChildTableData(List<AlignedColumn> alignedColumns) {
-    print('_createChildTableData called with ${childData.length} child items and ${alignedColumns.length} columns');
-    final rows = <TableRowData>[];
+  /// Tạo table rows cho child table
+  List<TableRow> _buildTableRows() {
+    final rows = <TableRow>[];
     
-    // Tạo header row
-    final headerCells = <TableCellData?>[];
-    for (final alignedColumn in alignedColumns) {
+    // Header row
+    final headerCells = <Widget>[];
+    for (final column in widget.childColumns) {
       headerCells.add(
-        TableCellData(
-          widget: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-            decoration: BoxDecoration(
-              color: Colors.yellow.shade100,
-              border: Border.all(color: Colors.grey.shade300),
-            ),
-            child: Text(
-              alignedColumn.childColumn.name,
-              style: const TextStyle(
-                fontWeight: FontWeight.bold,
-                fontSize: 12,
-              ),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+          decoration: BoxDecoration(
+            color: Colors.yellow.shade100,
+            border: Border.all(color: Colors.grey.shade300),
+          ),
+          child: Text(
+            column.name,
+            style: const TextStyle(
+              fontWeight: FontWeight.bold,
+              fontSize: 12,
             ),
           ),
         ),
       );
     }
-    rows.add(TableRowData(cells: headerCells));
-    print('Header row created with ${headerCells.length} cells');
+    rows.add(TableRow(children: headerCells));
     
-    // Tạo data rows
-    print('Creating data rows for ${childData.length} child items');
-    for (int itemIndex = 0; itemIndex < childData.length; itemIndex++) {
-      final childItem = childData[itemIndex];
-      final rowCells = <TableCellData?>[];
+    // Data rows
+    for (final childItem in widget.childData) {
+      final rowCells = <Widget>[];
       
-      print('Processing child item $itemIndex: $childItem');
-      for (int i = 0; i < childColumns.length; i++) {
-        final column = childColumns[i];
-        
+      for (final column in widget.childColumns) {
         TableCellData? cellData;
-        if (childCellBuilder != null) {
-          cellData = childCellBuilder!(childItem, column.key);
+        if (widget.childCellBuilder != null) {
+          cellData = widget.childCellBuilder!(childItem, column.key);
         }
         
         if (cellData == null) {
-          // Fallback: hiển thị giá trị mặc định
           final defaultValue = _getDefaultValue(childItem, column.key);
-          print('Using default value for column ${column.key}: $defaultValue');
           cellData = TableCellData(
             widget: Text(
               defaultValue,
@@ -190,33 +202,27 @@ class ChildTableWidget<C> extends StatelessWidget {
           );
         }
         
-        rowCells.add(cellData);
+        rowCells.add(
+          Container(
+            padding: widget.cellPadding,
+            decoration: BoxDecoration(
+              color: Colors.yellow.shade50,
+              border: Border.all(
+                color: Colors.grey.shade200,
+                width: 0.5,
+              ),
+            ),
+            child: cellData.widget,
+          ),
+        );
       }
       
-      rows.add(TableRowData(
-        cells: rowCells,
-        height: rowHeight,
-      ));
-      print('Added row $itemIndex with ${rowCells.length} cells');
+      rows.add(TableRow(children: rowCells));
     }
     
-    // Tính column widths dựa trên parent columns
-    final columnWidths = <double>[];
-    for (int i = 0; i < childColumns.length; i++) {
-      if (i < parentColumns.length) {
-        columnWidths.add(parentColumns[i].width);
-      } else {
-        columnWidths.add(120.0); // Default width
-      }
-    }
-    
-    print('Final TableData created with ${rows.length} rows and ${columnWidths.length} column widths');
-    return TableData(
-      rows: rows,
-      columnWidths: columnWidths,
-      showAlternatingRowColors: false,
-    );
+    return rows;
   }
+
 
   /// Lấy giá trị mặc định cho cell
   String _getDefaultValue(C childItem, String columnKey) {

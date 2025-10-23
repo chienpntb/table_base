@@ -172,6 +172,9 @@ class ExpandableRiverpodTable<T, C> extends ConsumerStatefulWidget {
 class _ExpandableRiverpodTableState<T, C> extends ConsumerState<ExpandableRiverpodTable<T, C>> {
   /// Set các row đang được expand
   final Set<String> _expandedRows = <String>{};
+
+  /// Trạng thái expand all
+  bool _isAllExpanded = false;
   
   // Map lưu trữ dữ liệu con đã load (có thể sử dụng trong tương lai)
   // final Map<String, List<C>> _cachedChildData = {};
@@ -230,7 +233,6 @@ class _ExpandableRiverpodTableState<T, C> extends ConsumerState<ExpandableRiverp
     WidgetsBinding.instance.addPostFrameCallback((_) {
       // Prevent multiple initializations
       if (_hasInitializedTable) {
-        print('ExpandableTable: Already initialized, skipping');
         return;
       }
 
@@ -250,9 +252,7 @@ class _ExpandableRiverpodTableState<T, C> extends ConsumerState<ExpandableRiverp
               columnWidths: columnWidths,
               valueGetter: widget.valueGetter,
             );
-        print('ExpandableTable: Initialize called with valueGetter: ${widget.valueGetter != null}');
       } else {
-        print('ExpandableTable: Data already exists, but ensuring valueGetter is set');
         // Ensure valueGetter is set even if data exists
         ref
             .read(widget.tableProvider.notifier)
@@ -260,7 +260,6 @@ class _ExpandableRiverpodTableState<T, C> extends ConsumerState<ExpandableRiverp
               columnWidths: columnWidths,
               valueGetter: widget.valueGetter,
             );
-        print('ExpandableTable: Re-initialize called with valueGetter: ${widget.valueGetter != null}');
       }
       _hasInitializedWidths = true;
       _hasInitializedTable = true;
@@ -566,6 +565,9 @@ class _ExpandableRiverpodTableState<T, C> extends ConsumerState<ExpandableRiverp
       showCheckboxColumn: widget.showCheckboxColumn,
       showActionsColumn: widget.showActionsColumn,
       actionsColumnWidth: widget.actionsColumnWidth,
+      showExpandColumn: true, // Hiển thị cột expand/collapse
+      onExpandAllToggle: _toggleExpandAll, // Callback để expand/collapse all
+      isAllExpanded: _isAllExpanded, // Trạng thái expand all
       showPageSizeFilter: widget.showPageSizeFilter,
       onSort: _handleSort,
       onShowFilterMenu: _showFilterMenu,
@@ -736,16 +738,34 @@ class _ExpandableRiverpodTableState<T, C> extends ConsumerState<ExpandableRiverp
   }
 
   Widget _buildChildTable(T parentItem, List<C> childData) {
-    print('_buildChildTable called with childData length: ${childData.length}');
-    return ChildTableWidget<C>(
-      childData: childData,
-      childColumns: widget.childColumns,
-      parentColumns: widget.columns,
-      title: widget.childTableTitle,
-      maxHeight: widget.childTableMaxHeight,
-      backgroundColor: widget.childTableBackgroundColor,
-      childCellBuilder: widget.childCellBuilder,
+    // Tính tổng chiều rộng của các cột dữ liệu (không bao gồm cột expand 40px)
+    final double dataColumnsWidth = _getDataColumnsTotalWidth();
+
+    return SizedBox(
+      width: dataColumnsWidth,
+      child: ChildTableWidget<C>(
+        childData: childData,
+        childColumns: widget.childColumns,
+        parentColumns: widget.columns,
+        title: widget.childTableTitle,
+        maxHeight: widget.childTableMaxHeight,
+        backgroundColor: widget.childTableBackgroundColor,
+        childCellBuilder: widget.childCellBuilder,
+        parentColumnWidths: _lastComputedWidths,
+        // Đẩy child table lệch phải để trùng với phần dữ liệu (sau nút expand 40px)
+        padding: const EdgeInsets.only(left: 40, top: 4, bottom: 4),
+      ),
     );
+  }
+
+  /// Tổng chiều rộng của các cột dữ liệu hiện tại (theo computed widths)
+  double _getDataColumnsTotalWidth() {
+    if (_lastComputedWidths.isEmpty) return 0;
+    double sum = 0;
+    for (final w in _lastComputedWidths.values) {
+      sum += w;
+    }
+    return sum;
   }
 
   void _toggleExpand(String itemId) {
@@ -754,6 +774,28 @@ class _ExpandableRiverpodTableState<T, C> extends ConsumerState<ExpandableRiverp
         _expandedRows.remove(itemId);
       } else {
         _expandedRows.add(itemId);
+      }
+    });
+  }
+
+  void _toggleExpandAll() {
+    setState(() {
+      if (_isAllExpanded) {
+        // Collapse all
+        _expandedRows.clear();
+        _isAllExpanded = false;
+      } else {
+        // Expand all
+        final tableState = ref.read(widget.tableProvider);
+        _expandedRows.clear();
+        for (final item in tableState.currentPageData) {
+          final itemId = _getItemId(item);
+          final childData = widget.childDataGetter(item);
+          if (childData != null && childData.isNotEmpty) {
+            _expandedRows.add(itemId);
+          }
+        }
+        _isAllExpanded = true;
       }
     });
   }

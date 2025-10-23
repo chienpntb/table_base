@@ -552,37 +552,37 @@ class ExpandableTableExample extends ConsumerWidget {
       TableColumnData(
         name: 'Dessert',
         key: 'name',
-        width: 200,
+        width: 200,  // Tăng width cho cột tên dessert (chứa text dài)
       ),
       TableColumnData(
         name: 'Commits',
         key: 'commits',
-        width: 120,
+        width: 80,   // Giảm width cho cột số (chỉ chứa số thập phân)
       ),
       TableColumnData(
         name: 'Tasks',
         key: 'tasks',
-        width: 100,
+        width: 70,   // Giảm width cho cột số nguyên
       ),
       TableColumnData(
         name: 'Projects',
         key: 'projects',
-        width: 120,
+        width: 80,   // Giảm width cho cột số nguyên
       ),
       TableColumnData(
         name: 'Hours',
         key: 'hours',
-        width: 120,
+        width: 90,   // Giảm width cho cột số lớn
       ),
       TableColumnData(
         name: 'Wins',
         key: 'wins',
-        width: 100,
+        width: 70,   // Giảm width cho cột số thập phân
       ),
       TableColumnData(
         name: 'Score',
         key: 'score',
-        width: 100,
+        width: 80,   // Giảm width cho cột số thập phân
       ),
     ];
   }
