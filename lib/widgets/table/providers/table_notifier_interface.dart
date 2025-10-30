@@ -24,6 +24,12 @@ abstract class TableNotifierInterface<T> extends StateNotifier<GenericTableState
   /// Thiết lập dữ liệu từ API cho chế độ API pagination
   void setApiData(List<T> data, {int? totalPages, int? currentPage, int? totalItems});
 
+  /// Clear dữ liệu và set loading state cho API pagination
+  void setApiLoading({String? errorMessage});
+
+  /// Set error state cho API pagination
+  void setApiError(String errorMessage);
+
   /// Sắp xếp dữ liệu theo cột
   void sort(int columnIndex);
 

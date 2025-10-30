@@ -96,6 +96,7 @@ class TableNotifier<T> extends TableNotifierInterface<T> {
 
   /// Thiết lập dữ liệu từ API cho chế độ API pagination
   /// Dùng khi nhận dữ liệu từ API call với pagination
+  @override
   void setApiData(List<T> data, {int? totalPages, int? currentPage, int? totalItems}) {
     if (state.paginationState.useApiPagination) {
       // Trong chế độ API pagination, data đã được phân trang từ server
@@ -115,13 +116,40 @@ class TableNotifier<T> extends TableNotifierInterface<T> {
     }
   }
 
+  /// Clear dữ liệu và set loading state cho API pagination
+  @override
+  void setApiLoading({String? errorMessage}) {
+    if (state.paginationState.useApiPagination) {
+      state = state.copyWith(
+        isLoading: true,
+        errorMessage: errorMessage,
+        currentPageData: [], // Clear data cũ
+      );
+    }
+  }
+
+  /// Set error state cho API pagination
+  @override
+  void setApiError(String errorMessage) {
+    if (state.paginationState.useApiPagination) {
+      state = state.copyWith(
+        isLoading: false,
+        errorMessage: errorMessage,
+        currentPageData: [], // Clear data khi có lỗi
+      );
+    }
+  }
+
   @override
   void goToPage(int page) {
     if (page < 0 || page >= state.paginationState.totalPages) return;
 
     if (state.paginationState.useApiPagination) {
-      // Cập nhật state
+      // Clear dữ liệu cũ và set loading state khi chuyển trang
       state = state.copyWith(
+        isLoading: true,
+        errorMessage: null,
+        currentPageData: [], // Clear data cũ
         paginationState: state.paginationState.copyWith(
           currentPageFromApi: page,
         ),
@@ -342,13 +370,10 @@ class TableNotifier<T> extends TableNotifierInterface<T> {
 
   /// Áp dụng tất cả bộ lọc hiện tại
   void _applyFilters() {
-    print('_applyFilters called with ${state.allData.length} allData items');
-    print('Active filters: ${state.filterState.columnFilters.length}');
     List<T> filteredData = List<T>.from(state.allData);
 
     // Áp dụng từng bộ lọc
     for (final filter in state.filterState.columnFilters.values) {
-      print('Applying filter for column ${filter.columnIndex}: ${filter.filterType}');
       filteredData = _filterDataByColumn(filteredData, filter);
     }
 
@@ -357,9 +382,6 @@ class TableNotifier<T> extends TableNotifierInterface<T> {
 
     // Cập nhật pagination
     final paginatedData = _getPaginatedData(sortedData);
-
-    print('Final filtered data: ${filteredData.length}, paginated: ${paginatedData.length}');
-
     state = state.copyWith(
       filteredData: sortedData,
       currentPageData: paginatedData,
@@ -372,31 +394,25 @@ class TableNotifier<T> extends TableNotifierInterface<T> {
 
   /// Lọc dữ liệu theo một cột cụ thể
   List<T> _filterDataByColumn(List<T> data, ColumnFilter filter) {
-    print('_filterDataByColumn called with ${data.length} items, filter: ${filter.filterType}');
     if (_valueGetter == null) {
-      print('_valueGetter is null, returning original data');
       return data;
     }
 
     final filteredData = data.where((item) {
       final value = _valueGetter!(item, filter.columnIndex);
       final result = _evaluateFilterCondition(value, filter);
-      print('Filtering item: $item, value: $value, result: $result');
       return result;
     }).toList();
     
-    print('Filtered data length: ${filteredData.length}');
     return filteredData;
   }
 
   /// Đánh giá điều kiện lọc
   bool _evaluateFilterCondition(dynamic value, ColumnFilter filter) {
-    print('_evaluateFilterCondition: value=$value, filterType=${filter.filterType}');
     
     // Lọc theo filter chọn nhiều giá trị
     if (filter.filterType == FilterType.select) {
       final result = filter.selectedValues.contains(value);
-      print('Select filter: selectedValues=${filter.selectedValues}, result=$result');
       return result;
     }
 
