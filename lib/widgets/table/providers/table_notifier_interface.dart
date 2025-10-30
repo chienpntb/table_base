@@ -21,6 +21,9 @@ abstract class TableNotifierInterface<T> extends StateNotifier<GenericTableState
   /// Tải dữ liệu mới
   Future<void> loadData([List<T>? data]);
 
+  /// Thiết lập dữ liệu từ API cho chế độ API pagination
+  void setApiData(List<T> data, {int? totalPages, int? currentPage, int? totalItems});
+
   /// Sắp xếp dữ liệu theo cột
   void sort(int columnIndex);
 
@@ -44,6 +47,16 @@ abstract class TableNotifierInterface<T> extends StateNotifier<GenericTableState
 
   /// Chuyển đến trang cuối cùng
   void lastPage();
+
+  /// Thiết lập thông tin phân trang từ API
+  void setApiPaginationInfo({
+    required int totalPages,
+    required int currentPage,
+    int? totalItems,
+  });
+
+  /// Bật/tắt chế độ phân trang API
+  void enableApiPagination(bool enabled);
 
   /// Áp dụng bộ lọc cho một cột
   void applyColumnFilter(int columnIndex, ColumnFilter filter);

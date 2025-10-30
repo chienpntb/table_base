@@ -22,6 +22,9 @@ class TableNotifier<T> extends TableNotifierInterface<T> {
   /// Function để lấy giá trị từ một mục theo cột
   dynamic Function(T item, int columnIndex)? _valueGetter;
 
+  /// Callback khi chuyển trang trong chế độ API pagination
+  Future<void> Function(int page)? _onPageChangedCallback;
+
   /// Hàm tạo dữ liệu mẫu - được ghi đè bởi các lớp con
   Future<List<T>> generateData() async {
     return [];
@@ -91,26 +94,62 @@ class TableNotifier<T> extends TableNotifierInterface<T> {
     }
   }
 
+  /// Thiết lập dữ liệu từ API cho chế độ API pagination
+  /// Dùng khi nhận dữ liệu từ API call với pagination
+  void setApiData(List<T> data, {int? totalPages, int? currentPage, int? totalItems}) {
+    if (state.paginationState.useApiPagination) {
+      // Trong chế độ API pagination, data đã được phân trang từ server
+      state = state.copyWith(
+        currentPageData: data,
+        isLoading: false,
+        errorMessage: null,
+        paginationState: state.paginationState.copyWith(
+          totalPagesFromApi: totalPages ?? state.paginationState.totalPagesFromApi,
+          currentPageFromApi: currentPage ?? state.paginationState.currentPageFromApi,
+          totalItems: totalItems ?? state.paginationState.totalItems,
+        ),
+      );
+    } else {
+      // Fallback về loadData thông thường
+      loadData(data);
+    }
+  }
+
   @override
   void goToPage(int page) {
     if (page < 0 || page >= state.paginationState.totalPages) return;
 
-    state = state.copyWith(
-      paginationState: state.paginationState.copyWith(currentPage: page),
-      currentPageData: _getPaginatedData(state.filteredData, page: page),
-    );
+    if (state.paginationState.useApiPagination) {
+      // Cập nhật state
+      state = state.copyWith(
+        paginationState: state.paginationState.copyWith(
+          currentPageFromApi: page,
+        ),
+      );
+      
+      // Gọi callback nếu có
+      _onPageChangedCallback?.call(page);
+    } else {
+      // Chế độ local pagination
+      state = state.copyWith(
+        paginationState: state.paginationState.copyWith(currentPage: page),
+        currentPageData: _getPaginatedData(state.filteredData, page: page),
+      );
+    }
   }
 
   @override
   void nextPage() {
     if (!state.paginationState.canGoNext) return;
-    goToPage(state.paginationState.currentPage + 1);
+    final currentDisplayPage = state.paginationState.currentDisplayPage;
+    goToPage(currentDisplayPage + 1);
   }
 
   @override
   void previousPage() {
     if (!state.paginationState.canGoPrevious) return;
-    goToPage(state.paginationState.currentPage - 1);
+    final currentDisplayPage = state.paginationState.currentDisplayPage;
+    goToPage(currentDisplayPage - 1);
   }
 
   @override
@@ -120,7 +159,61 @@ class TableNotifier<T> extends TableNotifierInterface<T> {
 
   @override
   void lastPage() {
-    goToPage(state.paginationState.totalPages - 1);
+    final state = this.state;
+    if (state.paginationState.useApiPagination) {
+      // Trong chế độ API pagination, chuyển đến trang cuối từ API
+      goToPage(state.paginationState.totalPages - 1);
+    } else {
+      // Chế độ local pagination
+      goToPage(state.paginationState.totalPages - 1);
+    }
+  }
+
+  @override
+  void setApiPaginationInfo({
+    required int totalPages,
+    required int currentPage,
+    int? totalItems,
+  }) {
+    state = state.copyWith(
+      paginationState: state.paginationState.copyWith(
+        useApiPagination: true,
+        totalPagesFromApi: totalPages,
+        currentPageFromApi: currentPage,
+        totalItems: totalItems ?? state.paginationState.totalItems,
+      ),
+    );
+  }
+
+  @override
+  void enableApiPagination(bool enabled) {
+    state = state.copyWith(
+      paginationState: state.paginationState.copyWith(
+        useApiPagination: enabled,
+        totalPagesFromApi: enabled ? state.paginationState.totalPagesFromApi : null,
+        currentPageFromApi: enabled ? state.paginationState.currentPageFromApi : null,
+      ),
+    );
+  }
+
+  /// Thiết lập API pagination với callback để load dữ liệu
+  /// Cách này cho phép bạn thiết lập từ bên ngoài nhưng vẫn tự động hóa
+  void setupApiPagination({
+    required Future<void> Function(int page) onPageChanged,
+    int? initialTotalPages,
+    int? initialCurrentPage,
+  }) {
+    enableApiPagination(true);
+    
+    if (initialTotalPages != null && initialCurrentPage != null) {
+      setApiPaginationInfo(
+        totalPages: initialTotalPages,
+        currentPage: initialCurrentPage,
+      );
+    }
+    
+    // Store callback để sử dụng khi chuyển trang
+    _onPageChangedCallback = onPageChanged;
   }
 
   @override
