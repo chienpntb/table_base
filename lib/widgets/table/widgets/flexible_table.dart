@@ -31,7 +31,6 @@ class _FlexibleTableState extends State<FlexibleTable> {
 
   @override
   Widget build(BuildContext context) {
-    print('FlexibleTable build - rows: ${widget.data.rows.length}, columnWidths: ${widget.data.columnWidths?.length ?? 0}');
     return Table(
       columnWidths: _buildColumnWidths(),
       defaultColumnWidth:
@@ -69,7 +68,6 @@ class _FlexibleTableState extends State<FlexibleTable> {
 
   /// Xây dựng các hàng cho bảng
   List<TableRow> _buildTableRows() {
-    print('_buildTableRows called with ${widget.data.rows.length} rows');
     List<TableRow> tableRows = [];
 
     for (int rowIndex = 0; rowIndex < widget.data.rows.length; rowIndex++) {
@@ -135,10 +133,8 @@ class _FlexibleTableState extends State<FlexibleTable> {
       }
 
       tableRows.add(tableRow);
-      print('Added tableRow $rowIndex with ${rowCells.length} cells');
     }
 
-    print('_buildTableRows returning ${tableRows.length} table rows');
     return tableRows;
   }
 

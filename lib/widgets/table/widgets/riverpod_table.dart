@@ -423,14 +423,16 @@ class _RiverpodTableState<T> extends ConsumerState<RiverpodTable<T>> {
         1,
       ),
       items: [
-        PopupMenuItem(
+            PopupMenuItem(
           padding: EdgeInsets.zero,
           enabled: false,
           child: FilterMenuWidget<T>(
             columnIndex: columnIndex,
             columnName: columnName,
             filterType: filterType,
-            allData: tableState.filteredData,
+                allData: tableState.paginationState.useApiPagination
+                    ? tableState.currentPageData
+                    : tableState.filteredData,
             valueGetter: widget.valueGetter,
             tableProvider: widget.tableProvider,
             currentFilter: currentFilter,
