@@ -231,10 +231,26 @@ class GenericTableState<T> {
     );
   }
 
-  List<T> get selectedItems =>
-      filteredData
-          .where(
-            (item) => selectionState.selectedIds.contains((item as dynamic).id),
-          )
-          .toList();
+  /// Lấy danh sách các item đã chọn trên trang hiện tại
+  List<T> get selectedItems {
+    // Khi dùng API pagination, lấy từ currentPageData
+    // Khi dùng local pagination, lấy từ filteredData
+    final List<T> sourceData = paginationState.useApiPagination
+        ? currentPageData
+        : filteredData;
+    
+    return sourceData
+        .where((item) {
+          final dynamic id = (item as dynamic).id;
+          final idString = id?.toString();
+          return idString != null && selectionState.selectedIds.contains(idString);
+        })
+        .toList();
+  }
+
+  /// Lấy danh sách ID đã chọn (dùng để query API khi cần lấy tất cả items từ nhiều trang)
+  List<String> get selectedIds => selectionState.selectedIds.toList();
+
+  /// Kiểm tra có item nào được chọn không
+  bool get hasSelectedItems => selectionState.selectedIds.isNotEmpty;
 }

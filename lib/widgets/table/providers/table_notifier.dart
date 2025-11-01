@@ -341,11 +341,18 @@ class TableNotifier<T> extends TableNotifierInterface<T> {
     }
 
     // Cập nhật trạng thái selectAll
-    final selectAll =
-        state.filteredData.isNotEmpty &&
-        state.filteredData.every(
-          (item) => newSelectedIds.contains((item as dynamic).id),
-        );
+    // Khi dùng API pagination, check trên currentPageData
+    // Khi dùng local pagination, check trên filteredData
+    final List<T> dataToCheck = state.paginationState.useApiPagination
+        ? state.currentPageData
+        : state.filteredData;
+    
+    final selectAll = dataToCheck.isNotEmpty &&
+        dataToCheck.every((item) {
+          final dynamic id = (item as dynamic).id;
+          final idString = id?.toString();
+          return idString != null && newSelectedIds.contains(idString);
+        });
 
     state = state.copyWith(
       selectionState: state.selectionState.copyWith(
@@ -360,15 +367,29 @@ class TableNotifier<T> extends TableNotifierInterface<T> {
     final selectAll = !state.selectionState.selectAll;
     final newSelectedIds = Set<String>.from(state.selectionState.selectedIds);
 
+    // Khi dùng API pagination, chỉ chọn/bỏ chọn items trên trang hiện tại
+    // Khi dùng local pagination, chọn/bỏ chọn tất cả filteredData
+    final List<T> dataToSelect = state.paginationState.useApiPagination
+        ? state.currentPageData
+        : state.filteredData;
+
     if (selectAll) {
       // Thêm tất cả ID vào danh sách đã chọn
-      for (var item in state.allData) {
-        newSelectedIds.add((item as dynamic).id.toString());
+      for (var item in dataToSelect) {
+        final dynamic id = (item as dynamic).id;
+        final idString = id?.toString();
+        if (idString != null) {
+          newSelectedIds.add(idString);
+        }
       }
     } else {
-      // Xóa tất cả ID khỏi danh sách đã chọn
-      for (var item in state.allData) {
-        newSelectedIds.remove((item as dynamic).id.toString());
+      // Xóa tất cả ID khỏi danh sách đã chọn (chỉ xóa những ID có trong trang hiện tại)
+      for (var item in dataToSelect) {
+        final dynamic id = (item as dynamic).id;
+        final idString = id?.toString();
+        if (idString != null) {
+          newSelectedIds.remove(idString);
+        }
       }
     }
 

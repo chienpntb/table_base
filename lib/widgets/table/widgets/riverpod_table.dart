@@ -664,9 +664,9 @@ class _RiverpodTableState<T> extends ConsumerState<RiverpodTable<T>> {
                   ),
                   value: isItemSelected,
                   onChanged:
-                      itemId == null
+                      itemIdString == null
                           ? null
-                          : (_) => notifier.toggleItemSelection(itemId),
+                          : (_) => notifier.toggleItemSelection(itemIdString),
                 ),
               ),
             );
