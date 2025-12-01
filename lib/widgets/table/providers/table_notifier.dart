@@ -418,17 +418,16 @@ class TableNotifier<T> extends TableNotifierInterface<T> {
     );
 
     // Nếu đang dùng API pagination, kích hoạt reload từ API với filter mới
+    // LƯU Ý:
+    // - Không thao tác trực tiếp state + _onPageChangedCallback để cho phép
+    //   lớp con override goToPage() (ví dụ: tự gọi loadDataFromApi)
+    // - Điều này tránh lỗi "loading quay mãi" khi enableApiPagination(true)
+    //   nhưng không thiết lập callback qua setupApiPagination()
     if (state.paginationState.useApiPagination) {
-      // Reset về trang đầu và set loading
-      state = state.copyWith(
-        isLoading: true,
-        errorMessage: null,
-        currentPageData: [],
-        paginationState: state.paginationState.copyWith(
-          currentPageFromApi: 0,
-        ),
-      );
-      _onPageChangedCallback?.call(0);
+      // Đưa về trang đầu, goToPage sẽ xử lý:
+      // - set isLoading / currentPageData
+      // - gọi callback hoặc logic override ở lớp con
+      goToPage(0);
       return;
     }
 
@@ -453,16 +452,11 @@ class TableNotifier<T> extends TableNotifierInterface<T> {
     );
 
     // Nếu đang dùng API pagination, kích hoạt reload từ API với filter mới
+    // Thay vì thao tác trực tiếp trên state, dùng goToPage(0) để:
+    // - Kích hoạt callback đã setup hoặc
+    // - Cho phép lớp con override goToPage() tự gọi API
     if (state.paginationState.useApiPagination) {
-      state = state.copyWith(
-        isLoading: true,
-        errorMessage: null,
-        currentPageData: [],
-        paginationState: state.paginationState.copyWith(
-          currentPageFromApi: 0,
-        ),
-      );
-      _onPageChangedCallback?.call(0);
+      goToPage(0);
       return;
     }
 
@@ -475,16 +469,11 @@ class TableNotifier<T> extends TableNotifierInterface<T> {
     state = state.copyWith(filterState: const TableFilterState());
 
     // Nếu đang dùng API pagination, kích hoạt reload từ API với filter mới
+    // Sử dụng goToPage(0) để tương thích với cả:
+    // - setupApiPagination(onPageChanged: ...)
+    // - override goToPage() trong lớp con
     if (state.paginationState.useApiPagination) {
-      state = state.copyWith(
-        isLoading: true,
-        errorMessage: null,
-        currentPageData: [],
-        paginationState: state.paginationState.copyWith(
-          currentPageFromApi: 0,
-        ),
-      );
-      _onPageChangedCallback?.call(0);
+      goToPage(0);
       return;
     }
 
