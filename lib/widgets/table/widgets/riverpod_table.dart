@@ -112,6 +112,9 @@ class RiverpodTable<T> extends ConsumerStatefulWidget {
   /// Callback khi nhấn nút xóa cho một item
   final void Function(T)? onDelete;
 
+  /// Callback kiểm tra xem có block delete cho item này không
+  final bool Function(T)? blockDelete;
+
   /// Hiển thị cột actions với các nút thêm, sửa, xóa
   final bool showActionsColumn;
 
@@ -146,6 +149,7 @@ class RiverpodTable<T> extends ConsumerStatefulWidget {
     this.onRowTap,
     this.onEdit,
     this.onDelete,
+    this.blockDelete,
     this.showActionsColumn = false,
     this.actionsColumnWidth = 120,
     this.customActions, // Add this line to the initializer list
@@ -681,6 +685,7 @@ class _RiverpodTableState<T> extends ConsumerState<RiverpodTable<T>> {
                   item: item,
                   onEdit: widget.onEdit,
                   onDelete: widget.onDelete,
+                  blockDelete: widget.blockDelete,
                   customActions: widget.customActions, // Thêm dòng này
                 ),
               ),

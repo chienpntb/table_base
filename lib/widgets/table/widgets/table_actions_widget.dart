@@ -13,6 +13,11 @@ class TableActionsWidget<T> extends StatelessWidget {
   /// Callback khi nhấn nút xóa
   final void Function(T)? onDelete;
 
+  /// Block delete: Function kiểm tra xem có block delete cho item này không
+  /// Trả về true nếu block (không cho xóa), false nếu cho phép xóa
+  /// Nếu null thì mặc định không block
+  final bool Function(T)? blockDelete;
+
   /// Danh sách các nút hành động tùy chỉnh
   final List<CustomAction<T>>? customActions;
 
@@ -21,6 +26,7 @@ class TableActionsWidget<T> extends StatelessWidget {
     required this.item,
     this.onEdit,
     this.onDelete,
+    this.blockDelete,
     this.customActions,
   });
 
@@ -63,20 +69,29 @@ class TableActionsWidget<T> extends StatelessWidget {
 
   /// Xây dựng nút xóa
   Widget _buildDeleteButton() {
+    // Kiểm tra xem có block delete không
+    final bool isBlocked = blockDelete?.call(item) ?? false;
+
+    // Màu icon: xám nếu bị block, đỏ nếu không
+    final Color iconColor = isBlocked ? Colors.grey : Colors.redAccent;
+
     return Tooltip(
-      message: 'Xóa',
+      message: isBlocked ? 'Không thể xóa' : 'Xóa',
       child: InkWell(
-        onTap: () => onDelete!(item),
+        onTap: isBlocked ? null : () => onDelete!(item),
         borderRadius: BorderRadius.circular(4),
-        child: Container(
-          padding: const EdgeInsets.all(8),
-          child: SvgPicture.asset(
-            AppIconSvg.iconTrash2,
-            width: 20,
-            height: 20,
-            colorFilter: const ColorFilter.mode(
-              Colors.redAccent,
-              BlendMode.srcIn,
+        child: Opacity(
+          opacity: isBlocked ? 0.5 : 1.0,
+          child: Container(
+            padding: const EdgeInsets.all(8),
+            child: SvgPicture.asset(
+              AppIconSvg.iconTrash2,
+              width: 20,
+              height: 20,
+              colorFilter: ColorFilter.mode(
+                iconColor,
+                BlendMode.srcIn,
+              ),
             ),
           ),
         ),
