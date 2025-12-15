@@ -8,6 +8,10 @@ import 'empty_state_widget.dart';
 
 /// Widget hiển thị nội dung chính của bảng
 class TableContentWidget<T> extends ConsumerWidget {
+    /// Màu line giữa các row
+    final Color? rowDividerColor;
+    /// Độ dày line giữa các row
+    final double rowDividerThickness;
   /// Provider quản lý trạng thái bảng
   final AutoDisposeStateNotifierProvider<
     TableNotifierInterface<T>,
@@ -77,6 +81,8 @@ class TableContentWidget<T> extends ConsumerWidget {
     this.errorWidget,
     this.emptyWidget,
     this.onRowTap,
+    this.rowDividerColor,
+    this.rowDividerThickness = 1.0,
   });
 
   @override
@@ -118,20 +124,17 @@ class TableContentWidget<T> extends ConsumerWidget {
         controller: verticalScrollController,
         child: SingleChildScrollView(
           scrollDirection: Axis.horizontal,
-          controller:
-              bodyController, // Sử dụng bodyController để đồng bộ với header
+          controller: bodyController, // Sử dụng bodyController để đồng bộ với header
           child: FlexibleTable(
             data: tableData,
             cellPadding: cellPadding ?? const EdgeInsets.all(12.0),
-            cellDecoration:
-                cellDecoration ?? const BoxDecoration(color: Colors.white),
+            cellDecoration: cellDecoration ?? const BoxDecoration(color: Colors.white),
             enableRowHover: enableRowHover,
             hoverColor: hoverColor ?? Colors.blue.shade50,
             selectedRowColor: selectedRowColor ?? Colors.blue.shade50,
-            onRowTap:
-                enableRowSelection
-                    ? (index) => _handleRowTap(index, ref)
-                    : null,
+            rowDividerColor: rowDividerColor,
+            rowDividerThickness: rowDividerThickness,
+            onRowTap: enableRowSelection ? (index) => _handleRowTap(index, ref) : null,
           ),
         ),
       ),
