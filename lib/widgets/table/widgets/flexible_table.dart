@@ -144,6 +144,11 @@ class _FlexibleTableState extends State<FlexibleTable> {
     int rowIndex,
     bool isHovered,
   ) {
+    // Ưu tiên màu riêng cho row nếu có
+    if (rowData.rowColor != null) {
+      return rowData.rowColor;
+    }
+
     // Màu khi hover
     if (isHovered && widget.enableRowHover && widget.hoverColor != null) {
       return widget.hoverColor;

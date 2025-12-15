@@ -26,6 +26,8 @@ import '../providers/table_notifier_interface.dart';
 /// - Đồng bộ hóa scroll giữa header và body
 /// - Phân phối không gian tự động khi resize cột
 class RiverpodTable<T> extends ConsumerStatefulWidget {
+    /// Callback để xác định màu của từng row theo điều kiện
+    final Color? Function(T item)? rowColorBuilder;
   /// Callback để tạo các ô cho một hàng từ một mục dữ liệu
   final List<TableCellData?> Function(T item)? cellsBuilder;
 
@@ -160,6 +162,7 @@ class RiverpodTable<T> extends ConsumerStatefulWidget {
     this.headerHeight = 48,
     this.showPageSizeFilter = 100,
     this.maxHeight,
+    this.rowColorBuilder,
   });
 
   @override
@@ -621,24 +624,23 @@ class _RiverpodTableState<T> extends ConsumerState<RiverpodTable<T>> {
     final notifier = ref.read(widget.tableProvider.notifier);
     // removed verbose build log
     // Tạo các hàng dữ liệu
+
     final dataRows = List<TableRowData>.generate(
       tableState.currentPageData.length,
       (index) {
         final item = tableState.currentPageData[index];
 
         // Kiểm tra xem mục này có được chọn không
-        final dynamic itemId =
-            widget.idGetter != null
-                ? widget.idGetter!(item)
-                : (item as dynamic).id;
+        final dynamic itemId = widget.idGetter != null
+            ? widget.idGetter!(item)
+            : (item as dynamic).id;
 
         if (itemId is! String && itemId is! int) {
-          print('Unsupported itemId type: ${itemId.runtimeType}');
+          print('Unsupported itemId type: [38;5;9m${itemId.runtimeType}[0m');
         }
 
         final String? itemIdString = itemId?.toString();
-        final bool isItemSelected =
-            itemIdString != null &&
+        final bool isItemSelected = itemIdString != null &&
             tableState.selectionState.selectedIds
                 .map((id) => id.toString())
                 .contains(itemIdString);
@@ -667,10 +669,9 @@ class _RiverpodTableState<T> extends ConsumerState<RiverpodTable<T>> {
                     AppColor.textGrey.withValues(alpha: .2),
                   ),
                   value: isItemSelected,
-                  onChanged:
-                      itemIdString == null
-                          ? null
-                          : (_) => notifier.toggleItemSelection(itemIdString),
+                  onChanged: itemIdString == null
+                      ? null
+                      : (_) => notifier.toggleItemSelection(itemIdString),
                 ),
               ),
             );
@@ -708,8 +709,20 @@ class _RiverpodTableState<T> extends ConsumerState<RiverpodTable<T>> {
             cells.add(TableCellData(widget: const SizedBox()));
           }
         }
+
+        // Lấy màu row theo điều kiện nếu có
+        Color? rowColor;
+        if (widget.rowColorBuilder != null) {
+          rowColor = widget.rowColorBuilder!(item);
+        }
+
         // Tạo hàng với các ô đã xử lý theo thứ tự cột hiện tại
-        return TableRowData(cells: cells, isSelected: isItemSelected);
+        // Giả định TableRowData có thuộc tính rowColor, nếu chưa có thì cần bổ sung ở nơi render row
+        return TableRowData(
+          cells: cells,
+          isSelected: isItemSelected,
+          rowColor: rowColor,
+        );
       },
     );
 
