@@ -26,6 +26,15 @@ import '../providers/table_notifier_interface.dart';
 /// - Đồng bộ hóa scroll giữa header và body
 /// - Phân phối không gian tự động khi resize cột
 class RiverpodTable<T> extends ConsumerStatefulWidget {
+  /// Màu line giữa các row
+  final Color? rowDividerColor;
+
+  /// Độ dày line giữa các row
+  final double rowDividerThickness;
+
+  /// Callback để xác định màu của từng row theo điều kiện
+  final Color? Function(T item)? rowColorBuilder;
+
   /// Callback để tạo các ô cho một hàng từ một mục dữ liệu
   final List<TableCellData?> Function(T item)? cellsBuilder;
 
@@ -112,6 +121,9 @@ class RiverpodTable<T> extends ConsumerStatefulWidget {
   /// Callback khi nhấn nút xóa cho một item
   final void Function(T)? onDelete;
 
+  /// Callback kiểm tra xem có block delete cho item này không
+  final bool Function(T)? blockDelete;
+
   /// Hiển thị cột actions với các nút thêm, sửa, xóa
   final bool showActionsColumn;
 
@@ -146,6 +158,7 @@ class RiverpodTable<T> extends ConsumerStatefulWidget {
     this.onRowTap,
     this.onEdit,
     this.onDelete,
+    this.blockDelete,
     this.showActionsColumn = false,
     this.actionsColumnWidth = 120,
     this.customActions, // Add this line to the initializer list
@@ -156,6 +169,9 @@ class RiverpodTable<T> extends ConsumerStatefulWidget {
     this.headerHeight = 48,
     this.showPageSizeFilter = 100,
     this.maxHeight,
+    this.rowColorBuilder,
+    this.rowDividerColor,
+    this.rowDividerThickness = 1.0,
   });
 
   @override
@@ -430,7 +446,10 @@ class _RiverpodTableState<T> extends ConsumerState<RiverpodTable<T>> {
             columnIndex: columnIndex,
             columnName: columnName,
             filterType: filterType,
-            allData: tableState.filteredData,
+            allData:
+                tableState.paginationState.useApiPagination
+                    ? tableState.currentPageData
+                    : tableState.filteredData,
             valueGetter: widget.valueGetter,
             tableProvider: widget.tableProvider,
             currentFilter: currentFilter,
@@ -538,6 +557,8 @@ class _RiverpodTableState<T> extends ConsumerState<RiverpodTable<T>> {
                         tableData: _createTableData(),
                         bodyController: _bodyController,
                         verticalScrollController: verticalScrollController,
+                        rowDividerColor: widget.rowDividerColor,
+                        rowDividerThickness: widget.rowDividerThickness,
                       ),
                       const SizedBox(height: 4),
                       _buildHorizontalScrollbar(),
@@ -615,96 +636,109 @@ class _RiverpodTableState<T> extends ConsumerState<RiverpodTable<T>> {
     final notifier = ref.read(widget.tableProvider.notifier);
     // removed verbose build log
     // Tạo các hàng dữ liệu
-    final dataRows = List<TableRowData>.generate(
-      tableState.currentPageData.length,
-      (index) {
-        final item = tableState.currentPageData[index];
 
-        // Kiểm tra xem mục này có được chọn không
-        final dynamic itemId =
-            widget.idGetter != null
-                ? widget.idGetter!(item)
-                : (item as dynamic).id;
+    final dataRows = List<
+      TableRowData
+    >.generate(tableState.currentPageData.length, (index) {
+      final item = tableState.currentPageData[index];
 
-        if (itemId is! String && itemId is! int) {
-          print('Unsupported itemId type: ${itemId.runtimeType}');
+      // Kiểm tra xem mục này có được chọn không
+      final dynamic itemId =
+          widget.idGetter != null
+              ? widget.idGetter!(item)
+              : (item as dynamic).id;
+
+      if (itemId is! String && itemId is! int) {
+        print('Unsupported itemId type: [38;5;9m${itemId.runtimeType}[0m');
+      }
+
+      final String? itemIdString = itemId?.toString();
+      final bool isItemSelected =
+          itemIdString != null &&
+          tableState.selectionState.selectedIds
+              .map((id) => id.toString())
+              .contains(itemIdString);
+
+      // Dựng lại danh sách ô theo đúng thứ tự hiển thị hiện tại của _columns
+      final List<TableCellData?> cells = [];
+      // Tối ưu: chỉ build cells một lần cho mỗi hàng nếu cần dùng
+      final List<TableCellData?> builtCells =
+          widget.cellsBuilder != null ? widget.cellsBuilder!(item) : [];
+
+      for (int colIndex = 0; colIndex < _columns.length; colIndex++) {
+        final column = _columns[colIndex];
+
+        // Cột checkbox
+        if (widget.showCheckboxColumn && column.key == 'checkbox') {
+          cells.add(
+            TableCellData(
+              widget: Checkbox(
+                activeColor: AppColor.greenLight,
+                checkColor: Colors.white,
+                side: BorderSide(color: AppColor.textGrey, width: 1.6),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(4),
+                ),
+                overlayColor: WidgetStatePropertyAll<Color>(
+                  AppColor.textGrey.withValues(alpha: .2),
+                ),
+                value: isItemSelected,
+                onChanged:
+                    itemIdString == null
+                        ? null
+                        : (_) => notifier.toggleItemSelection(itemIdString),
+              ),
+            ),
+          );
+          continue;
         }
 
-        final String? itemIdString = itemId?.toString();
-        final bool isItemSelected =
-            itemIdString != null &&
-            tableState.selectionState.selectedIds
-                .map((id) => id.toString())
-                .contains(itemIdString);
-
-        // Dựng lại danh sách ô theo đúng thứ tự hiển thị hiện tại của _columns
-        final List<TableCellData?> cells = [];
-        // Tối ưu: chỉ build cells một lần cho mỗi hàng nếu cần dùng
-        final List<TableCellData?> builtCells =
-            widget.cellsBuilder != null ? widget.cellsBuilder!(item) : [];
-
-        for (int colIndex = 0; colIndex < _columns.length; colIndex++) {
-          final column = _columns[colIndex];
-
-          // Cột checkbox
-          if (widget.showCheckboxColumn && column.key == 'checkbox') {
-            cells.add(
-              TableCellData(
-                widget: Checkbox(
-                  activeColor: AppColor.greenLight,
-                  checkColor: Colors.white,
-                  side: BorderSide(color: AppColor.textGrey, width: 1.6),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(4),
-                  ),
-                  overlayColor: WidgetStatePropertyAll<Color>(
-                    AppColor.textGrey.withValues(alpha: .2),
-                  ),
-                  value: isItemSelected,
-                  onChanged:
-                      itemId == null
-                          ? null
-                          : (_) => notifier.toggleItemSelection(itemId),
-                ),
+        // Cột actions
+        if (widget.showActionsColumn && column.key == 'actions') {
+          cells.add(
+            TableCellData(
+              widget: TableActionsWidget<T>(
+                item: item,
+                onEdit: widget.onEdit,
+                onDelete: widget.onDelete,
+                blockDelete: widget.blockDelete,
+                customActions: widget.customActions, // Thêm dòng này
               ),
-            );
+            ),
+          );
+          continue;
+        }
+
+        if (widget.cellBuilderByKey != null) {
+          final customCell = widget.cellBuilderByKey!(item, column.key);
+          if (customCell != null) {
+            cells.add(customCell);
             continue;
-          }
-
-          // Cột actions
-          if (widget.showActionsColumn && column.key == 'actions') {
-            cells.add(
-              TableCellData(
-                widget: TableActionsWidget<T>(
-                  item: item,
-                  onEdit: widget.onEdit,
-                  onDelete: widget.onDelete,
-                  customActions: widget.customActions, // Thêm dòng này
-                ),
-              ),
-            );
-            continue;
-          }
-
-          if (widget.cellBuilderByKey != null) {
-            final customCell = widget.cellBuilderByKey!(item, column.key);
-            if (customCell != null) {
-              cells.add(customCell);
-              continue;
-            }
-          }
-
-          // Fallback sang cellsBuilder theo vị trí (đã được cache ở trên)
-          if (colIndex < builtCells.length) {
-            cells.add(builtCells[colIndex]);
-          } else {
-            cells.add(TableCellData(widget: const SizedBox()));
           }
         }
-        // Tạo hàng với các ô đã xử lý theo thứ tự cột hiện tại
-        return TableRowData(cells: cells, isSelected: isItemSelected);
-      },
-    );
+
+        // Fallback sang cellsBuilder theo vị trí (đã được cache ở trên)
+        if (colIndex < builtCells.length) {
+          cells.add(builtCells[colIndex]);
+        } else {
+          cells.add(TableCellData(widget: const SizedBox()));
+        }
+      }
+
+      // Lấy màu row theo điều kiện nếu có
+      Color? rowColor;
+      if (widget.rowColorBuilder != null) {
+        rowColor = widget.rowColorBuilder!(item);
+      }
+
+      // Tạo hàng với các ô đã xử lý theo thứ tự cột hiện tại
+      // Giả định TableRowData có thuộc tính rowColor, nếu chưa có thì cần bổ sung ở nơi render row
+      return TableRowData(
+        cells: cells,
+        isSelected: isItemSelected,
+        rowColor: rowColor,
+      );
+    });
 
     final orderedWidths = _columns
         .map((c) => _lastComputedWidths[c.key] ?? c.width)

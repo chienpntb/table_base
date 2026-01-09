@@ -21,6 +21,30 @@ abstract class TableNotifierInterface<T> extends StateNotifier<GenericTableState
   /// Tải dữ liệu mới
   Future<void> loadData([List<T>? data]);
 
+  /// Thiết lập dữ liệu từ API cho chế độ API pagination
+  void setApiData(List<T> data, {int? totalPages, int? currentPage, int? totalItems});
+
+  /// Cập nhật dữ liệu trang hiện tại từ API nhưng không xóa dữ liệu trước đó
+  /// và không ép trạng thái loading (giữ nguyên isLoading hiện tại nếu không chỉ định)
+  void setApiDataSoft(
+    List<T> data, {
+    int? totalPages,
+    int? currentPage,
+    int? totalItems,
+    bool? isLoading,
+  });
+
+  /// Clear dữ liệu và set loading state cho API pagination
+  void setApiLoading({String? errorMessage});
+
+  /// Set error state cho API pagination
+  void setApiError(String errorMessage);
+
+  /// Chuẩn bị chuyển trang API: cho phép clear data mà không cần bật loading
+  /// - clearData: có xóa dữ liệu trang hiện tại hay không
+  /// - showLoading: có bật trạng thái loading hay không
+  void setApiPreparing({bool clearData = true, bool showLoading = true});
+
   /// Sắp xếp dữ liệu theo cột
   void sort(int columnIndex);
 
@@ -33,6 +57,9 @@ abstract class TableNotifierInterface<T> extends StateNotifier<GenericTableState
   /// Chuyển trang
   void goToPage(int page);
 
+  /// Chuyển trang không bật loading (tùy chọn clear dữ liệu)
+  void goToPageSilently(int page, {bool clearData = true});
+
   /// Chuyển đến trang tiếp theo
   void nextPage();
 
@@ -44,6 +71,16 @@ abstract class TableNotifierInterface<T> extends StateNotifier<GenericTableState
 
   /// Chuyển đến trang cuối cùng
   void lastPage();
+
+  /// Thiết lập thông tin phân trang từ API
+  void setApiPaginationInfo({
+    required int totalPages,
+    required int currentPage,
+    int? totalItems,
+  });
+
+  /// Bật/tắt chế độ phân trang API
+  void enableApiPagination(bool enabled);
 
   /// Áp dụng bộ lọc cho một cột
   void applyColumnFilter(int columnIndex, ColumnFilter filter);

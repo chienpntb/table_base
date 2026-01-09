@@ -13,6 +13,11 @@ class TableActionsWidget<T> extends StatelessWidget {
   /// Callback khi nhấn nút xóa
   final void Function(T)? onDelete;
 
+  /// Block delete: Function kiểm tra xem có block delete cho item này không
+  /// Trả về true nếu block (không cho xóa), false nếu cho phép xóa
+  /// Nếu null thì mặc định không block
+  final bool Function(T)? blockDelete;
+
   /// Danh sách các nút hành động tùy chỉnh
   final List<CustomAction<T>>? customActions;
 
@@ -21,6 +26,7 @@ class TableActionsWidget<T> extends StatelessWidget {
     required this.item,
     this.onEdit,
     this.onDelete,
+    this.blockDelete,
     this.customActions,
   });
 
@@ -63,20 +69,29 @@ class TableActionsWidget<T> extends StatelessWidget {
 
   /// Xây dựng nút xóa
   Widget _buildDeleteButton() {
+    // Kiểm tra xem có block delete không
+    final bool isBlocked = blockDelete?.call(item) ?? false;
+
+    // Màu icon: xám nếu bị block, đỏ nếu không
+    final Color iconColor = isBlocked ? Colors.grey : Colors.redAccent;
+
     return Tooltip(
-      message: 'Xóa',
+      message: isBlocked ? 'Không thể xóa' : 'Xóa',
       child: InkWell(
-        onTap: () => onDelete!(item),
+        onTap: isBlocked ? null : () => onDelete!(item),
         borderRadius: BorderRadius.circular(4),
-        child: Container(
-          padding: const EdgeInsets.all(8),
-          child: SvgPicture.asset(
-            AppIconSvg.iconTrash2,
-            width: 20,
-            height: 20,
-            colorFilter: const ColorFilter.mode(
-              Colors.redAccent,
-              BlendMode.srcIn,
+        child: Opacity(
+          opacity: isBlocked ? 0.5 : 1.0,
+          child: Container(
+            padding: const EdgeInsets.all(8),
+            child: SvgPicture.asset(
+              AppIconSvg.iconTrash2,
+              width: 20,
+              height: 20,
+              colorFilter: ColorFilter.mode(
+                iconColor,
+                BlendMode.srcIn,
+              ),
             ),
           ),
         ),
@@ -87,20 +102,36 @@ class TableActionsWidget<T> extends StatelessWidget {
   /// Xây dựng danh sách các nút tùy chỉnh
   List<Widget> _buildCustomActions() {
     return customActions!.map((action) {
+      // Kiểm tra xem có block action không
+      final bool isBlocked = action.block?.call(item) ?? false;
+      
+      // Màu icon: xám nếu bị block, màu mặc định nếu không
+      final Color iconColor = isBlocked 
+          ? Colors.grey 
+          : (action.color ?? Colors.redAccent);
+      
+      // Tooltip: tooltip block nếu bị block, tooltip thường nếu không
+      final String? tooltipMessage = isBlocked 
+          ? (action.blockTooltip ?? action.tooltip)
+          : action.tooltip;
+      
       return Tooltip(
-        message: action.tooltip,
+        message: tooltipMessage ?? '',
         child: InkWell(
-          onTap: () => action.onPressed(item),
+          onTap: isBlocked ? null : () => action.onPressed(item),
           borderRadius: BorderRadius.circular(4),
-          child: Container(
-            padding: const EdgeInsets.all(8),
-            child: SvgPicture.asset(
-              action.iconPath,
-              width: 20,
-              height: 20,
-              colorFilter: ColorFilter.mode(
-                action.color ?? Colors.redAccent,
-                BlendMode.srcIn,
+          child: Opacity(
+            opacity: isBlocked ? 0.5 : 1.0,
+            child: Container(
+              padding: const EdgeInsets.all(8),
+              child: SvgPicture.asset(
+                action.iconPath,
+                width: 20,
+                height: 20,
+                colorFilter: ColorFilter.mode(
+                  iconColor,
+                  BlendMode.srcIn,
+                ),
               ),
             ),
           ),
@@ -116,11 +147,21 @@ class CustomAction<T> {
   final void Function(T) onPressed;
   final Color? color;
   final String? tooltip;
+  
+  /// Block action: Function kiểm tra xem có block action cho item này không
+  /// Trả về true nếu block (không cho thao tác), false nếu cho phép
+  /// Nếu null thì mặc định không block
+  final bool Function(T)? block;
+  
+  /// Tooltip hiển thị khi action bị block
+  final String? blockTooltip;
 
   CustomAction({
     required this.iconPath,
     required this.onPressed,
     this.color,
     this.tooltip,
+    this.block,
+    this.blockTooltip,
   });
 }

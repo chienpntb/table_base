@@ -77,7 +77,7 @@ class PaginationBar<T> extends ConsumerWidget {
 
     final List<Widget> buttons = [];
     final int totalPages = pagination.totalPages;
-    final int currentPage = pagination.currentPage;
+    final int currentPage = pagination.currentDisplayPage; // Sử dụng currentDisplayPage
 
     if (totalPages <= maxVisiblePages) {
       for (int i = 0; i < totalPages; i++) {

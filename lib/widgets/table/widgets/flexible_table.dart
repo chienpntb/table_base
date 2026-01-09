@@ -3,6 +3,11 @@ import '../models/table_model.dart';
 
 /// Widget bảng linh hoạt hỗ trợ nhiều tùy chọn hiển thị và tương tác
 class FlexibleTable extends StatefulWidget {
+  /// Màu line giữa các row
+  final Color? rowDividerColor;
+
+  /// Độ dày line giữa các row
+  final double rowDividerThickness;
   final TableData data; // Dữ liệu cho bảng
   final BoxDecoration? cellDecoration; // Trang trí cho ô dữ liệu thông thường
   final EdgeInsets cellPadding; // Khoảng cách lề bên trong ô
@@ -20,6 +25,8 @@ class FlexibleTable extends StatefulWidget {
     this.hoverColor,
     this.selectedRowColor,
     this.onRowTap,
+    this.rowDividerColor,
+    this.rowDividerThickness = 1.0,
   });
 
   @override
@@ -72,8 +79,7 @@ class _FlexibleTableState extends State<FlexibleTable> {
 
     for (int rowIndex = 0; rowIndex < widget.data.rows.length; rowIndex++) {
       final rowData = widget.data.rows[rowIndex];
-      final bool isHovered =
-          _hoveredRowIndex == rowIndex; // Hàng đang được hover
+      final bool isHovered = _hoveredRowIndex == rowIndex;
 
       // Xác định màu nền cho hàng
       Color? rowBackgroundColor = _getRowBackgroundColor(
@@ -87,19 +93,16 @@ class _FlexibleTableState extends State<FlexibleTable> {
         final cellData = rowData.cells[colIndex];
 
         if (cellData == null) {
-          // Ô này đã bị phủ bởi một ô khác (colspan/rowspan), thêm widget trống
           rowCells.add(const SizedBox());
           continue;
         }
 
-        // Tạo ô với decoration và padding
         Widget cellWidget = Container(
           padding: widget.cellPadding,
           height: rowData.height ?? widget.data.defaultRowHeight,
           child: Align(alignment: cellData.alignment, child: cellData.widget),
         );
 
-        // Xử lý colspan và rowspan
         if (cellData.colSpan > 1 || cellData.rowSpan > 1) {
           cellWidget = TableCell(
             verticalAlignment: TableCellVerticalAlignment.middle,
@@ -110,19 +113,36 @@ class _FlexibleTableState extends State<FlexibleTable> {
         rowCells.add(cellWidget);
       }
 
-      // Tạo decoration cho cell
+      // Tạo decoration cho cell, bổ sung border bottom nếu không phải row cuối
       BoxDecoration? cellBoxDecoration = _getCellDecoration(
         rowData: rowData,
         backgroundColor: rowBackgroundColor,
       );
 
-      // Tạo hàng với xử lý sự kiện
+      // Bổ sung border bottom cho line giữa các row (trừ row cuối)
+      if (rowIndex < widget.data.rows.length - 1) {
+        final borderColor = widget.rowDividerColor ?? Colors.grey.shade300;
+        final borderWidth = widget.rowDividerThickness;
+        final border =
+            cellBoxDecoration?.border is Border
+                ? cellBoxDecoration!.border as Border
+                : null;
+        cellBoxDecoration = (cellBoxDecoration ?? const BoxDecoration())
+            .copyWith(
+              border: Border(
+                bottom: BorderSide(color: borderColor, width: borderWidth),
+                left: border?.left ?? BorderSide.none,
+                right: border?.right ?? BorderSide.none,
+                top: border?.top ?? BorderSide.none,
+              ),
+            );
+      }
+
       TableRow tableRow = TableRow(
         decoration: cellBoxDecoration,
         children: rowCells,
       );
 
-      // Thêm gesture detector nếu có sự kiện onTap hoặc bật hover
       if (widget.onRowTap != null || widget.enableRowHover) {
         tableRow = _wrapRowWithGestureDetector(
           tableRow,
@@ -144,6 +164,11 @@ class _FlexibleTableState extends State<FlexibleTable> {
     int rowIndex,
     bool isHovered,
   ) {
+    // Ưu tiên màu riêng cho row nếu có
+    if (rowData.rowColor != null) {
+      return rowData.rowColor;
+    }
+
     // Màu khi hover
     if (isHovered && widget.enableRowHover && widget.hoverColor != null) {
       return widget.hoverColor;

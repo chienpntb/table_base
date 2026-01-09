@@ -22,6 +22,9 @@ class TableNotifier<T> extends TableNotifierInterface<T> {
   /// Function để lấy giá trị từ một mục theo cột
   dynamic Function(T item, int columnIndex)? _valueGetter;
 
+  /// Callback khi chuyển trang trong chế độ API pagination
+  Future<void> Function(int page)? _onPageChangedCallback;
+
   /// Hàm tạo dữ liệu mẫu - được ghi đè bởi các lớp con
   Future<List<T>> generateData() async {
     return [];
@@ -91,26 +94,150 @@ class TableNotifier<T> extends TableNotifierInterface<T> {
     }
   }
 
+  /// Thiết lập dữ liệu từ API cho chế độ API pagination
+  /// Dùng khi nhận dữ liệu từ API call với pagination
+  @override
+  void setApiData(List<T> data, {int? totalPages, int? currentPage, int? totalItems}) {
+    if (state.paginationState.useApiPagination) {
+      // Trong chế độ API pagination, data đã được phân trang từ server
+      state = state.copyWith(
+        currentPageData: data,
+        isLoading: false,
+        errorMessage: null,
+        paginationState: state.paginationState.copyWith(
+          totalPagesFromApi: totalPages ?? state.paginationState.totalPagesFromApi,
+          currentPageFromApi: currentPage ?? state.paginationState.currentPageFromApi,
+          totalItems: totalItems ?? state.paginationState.totalItems,
+        ),
+      );
+    } else {
+      // Fallback về loadData thông thường
+      loadData(data);
+    }
+  }
+
+  /// Cập nhật dữ liệu trang hiện tại mà không làm trống dữ liệu trước đó
+  /// và không ép chuyển trạng thái loading nếu không truyền vào
+  @override
+  void setApiDataSoft(
+    List<T> data, {
+    int? totalPages,
+    int? currentPage,
+    int? totalItems,
+    bool? isLoading,
+  }) {
+    if (state.paginationState.useApiPagination) {
+      state = state.copyWith(
+        currentPageData: data,
+        isLoading: isLoading ?? state.isLoading,
+        errorMessage: null,
+        paginationState: state.paginationState.copyWith(
+          totalPagesFromApi: totalPages ?? state.paginationState.totalPagesFromApi,
+          currentPageFromApi: currentPage ?? state.paginationState.currentPageFromApi,
+          totalItems: totalItems ?? state.paginationState.totalItems,
+        ),
+      );
+    } else {
+      // Fallback: local mode behaves like setApiData
+      setApiData(data, totalPages: totalPages, currentPage: currentPage, totalItems: totalItems);
+    }
+  }
+
+  /// Clear dữ liệu và set loading state cho API pagination
+  @override
+  void setApiLoading({String? errorMessage}) {
+    if (state.paginationState.useApiPagination) {
+      state = state.copyWith(
+        isLoading: true,
+        errorMessage: errorMessage,
+        currentPageData: [], // Clear data cũ
+      );
+    }
+  }
+
+  /// Set error state cho API pagination
+  @override
+  void setApiError(String errorMessage) {
+    if (state.paginationState.useApiPagination) {
+      state = state.copyWith(
+        isLoading: false,
+        errorMessage: errorMessage,
+        currentPageData: [], // Clear data khi có lỗi
+      );
+    }
+  }
+
+  /// Chuẩn bị chuyển trang API
+  /// - Cho phép clear dữ liệu cũ và có thể không bật loading
+  @override
+  void setApiPreparing({bool clearData = true, bool showLoading = true}) {
+    if (!state.paginationState.useApiPagination) return;
+    state = state.copyWith(
+      isLoading: showLoading ? true : state.isLoading,
+      errorMessage: null,
+      currentPageData: clearData ? [] : state.currentPageData,
+    );
+  }
+
   @override
   void goToPage(int page) {
     if (page < 0 || page >= state.paginationState.totalPages) return;
 
+    if (state.paginationState.useApiPagination) {
+      // Clear dữ liệu cũ và set loading state khi chuyển trang
+      state = state.copyWith(
+        isLoading: true,
+        errorMessage: null,
+        currentPageData: [], // Clear data cũ
+        paginationState: state.paginationState.copyWith(
+          currentPageFromApi: page,
+        ),
+      );
+      
+      // Gọi callback nếu có
+      _onPageChangedCallback?.call(page);
+    } else {
+      // Chế độ local pagination
+      state = state.copyWith(
+        paginationState: state.paginationState.copyWith(currentPage: page),
+        currentPageData: _getPaginatedData(state.filteredData, page: page),
+      );
+    }
+  }
+
+  /// Chuyển trang mà không bật loading; có thể tùy chọn clear dữ liệu
+  @override
+  void goToPageSilently(int page, {bool clearData = true}) {
+    if (page < 0 || page >= state.paginationState.totalPages) return;
+    if (!state.paginationState.useApiPagination) {
+      goToPage(page);
+      return;
+    }
+
     state = state.copyWith(
-      paginationState: state.paginationState.copyWith(currentPage: page),
-      currentPageData: _getPaginatedData(state.filteredData, page: page),
+      // giữ nguyên isLoading
+      errorMessage: null,
+      currentPageData: clearData ? [] : state.currentPageData,
+      paginationState: state.paginationState.copyWith(
+        currentPageFromApi: page,
+      ),
     );
+
+    _onPageChangedCallback?.call(page);
   }
 
   @override
   void nextPage() {
     if (!state.paginationState.canGoNext) return;
-    goToPage(state.paginationState.currentPage + 1);
+    final currentDisplayPage = state.paginationState.currentDisplayPage;
+    goToPage(currentDisplayPage + 1);
   }
 
   @override
   void previousPage() {
     if (!state.paginationState.canGoPrevious) return;
-    goToPage(state.paginationState.currentPage - 1);
+    final currentDisplayPage = state.paginationState.currentDisplayPage;
+    goToPage(currentDisplayPage - 1);
   }
 
   @override
@@ -120,7 +247,61 @@ class TableNotifier<T> extends TableNotifierInterface<T> {
 
   @override
   void lastPage() {
-    goToPage(state.paginationState.totalPages - 1);
+    final state = this.state;
+    if (state.paginationState.useApiPagination) {
+      // Trong chế độ API pagination, chuyển đến trang cuối từ API
+      goToPage(state.paginationState.totalPages - 1);
+    } else {
+      // Chế độ local pagination
+      goToPage(state.paginationState.totalPages - 1);
+    }
+  }
+
+  @override
+  void setApiPaginationInfo({
+    required int totalPages,
+    required int currentPage,
+    int? totalItems,
+  }) {
+    state = state.copyWith(
+      paginationState: state.paginationState.copyWith(
+        useApiPagination: true,
+        totalPagesFromApi: totalPages,
+        currentPageFromApi: currentPage,
+        totalItems: totalItems ?? state.paginationState.totalItems,
+      ),
+    );
+  }
+
+  @override
+  void enableApiPagination(bool enabled) {
+    state = state.copyWith(
+      paginationState: state.paginationState.copyWith(
+        useApiPagination: enabled,
+        totalPagesFromApi: enabled ? state.paginationState.totalPagesFromApi : null,
+        currentPageFromApi: enabled ? state.paginationState.currentPageFromApi : null,
+      ),
+    );
+  }
+
+  /// Thiết lập API pagination với callback để load dữ liệu
+  /// Cách này cho phép bạn thiết lập từ bên ngoài nhưng vẫn tự động hóa
+  void setupApiPagination({
+    required Future<void> Function(int page) onPageChanged,
+    int? initialTotalPages,
+    int? initialCurrentPage,
+  }) {
+    enableApiPagination(true);
+    
+    if (initialTotalPages != null && initialCurrentPage != null) {
+      setApiPaginationInfo(
+        totalPages: initialTotalPages,
+        currentPage: initialCurrentPage,
+      );
+    }
+    
+    // Store callback để sử dụng khi chuyển trang
+    _onPageChangedCallback = onPageChanged;
   }
 
   @override
@@ -160,11 +341,18 @@ class TableNotifier<T> extends TableNotifierInterface<T> {
     }
 
     // Cập nhật trạng thái selectAll
-    final selectAll =
-        state.filteredData.isNotEmpty &&
-        state.filteredData.every(
-          (item) => newSelectedIds.contains((item as dynamic).id),
-        );
+    // Khi dùng API pagination, check trên currentPageData
+    // Khi dùng local pagination, check trên filteredData
+    final List<T> dataToCheck = state.paginationState.useApiPagination
+        ? state.currentPageData
+        : state.filteredData;
+    
+    final selectAll = dataToCheck.isNotEmpty &&
+        dataToCheck.every((item) {
+          final dynamic id = (item as dynamic).id;
+          final idString = id?.toString();
+          return idString != null && newSelectedIds.contains(idString);
+        });
 
     state = state.copyWith(
       selectionState: state.selectionState.copyWith(
@@ -179,15 +367,29 @@ class TableNotifier<T> extends TableNotifierInterface<T> {
     final selectAll = !state.selectionState.selectAll;
     final newSelectedIds = Set<String>.from(state.selectionState.selectedIds);
 
+    // Khi dùng API pagination, chỉ chọn/bỏ chọn items trên trang hiện tại
+    // Khi dùng local pagination, chọn/bỏ chọn tất cả filteredData
+    final List<T> dataToSelect = state.paginationState.useApiPagination
+        ? state.currentPageData
+        : state.filteredData;
+
     if (selectAll) {
       // Thêm tất cả ID vào danh sách đã chọn
-      for (var item in state.allData) {
-        newSelectedIds.add((item as dynamic).id.toString());
+      for (var item in dataToSelect) {
+        final dynamic id = (item as dynamic).id;
+        final idString = id?.toString();
+        if (idString != null) {
+          newSelectedIds.add(idString);
+        }
       }
     } else {
-      // Xóa tất cả ID khỏi danh sách đã chọn
-      for (var item in state.allData) {
-        newSelectedIds.remove((item as dynamic).id.toString());
+      // Xóa tất cả ID khỏi danh sách đã chọn (chỉ xóa những ID có trong trang hiện tại)
+      for (var item in dataToSelect) {
+        final dynamic id = (item as dynamic).id;
+        final idString = id?.toString();
+        if (idString != null) {
+          newSelectedIds.remove(idString);
+        }
       }
     }
 
@@ -215,7 +417,21 @@ class TableNotifier<T> extends TableNotifierInterface<T> {
       ),
     );
 
-    // Áp dụng lọc và cập nhật dữ liệu
+    // Nếu đang dùng API pagination, kích hoạt reload từ API với filter mới
+    // LƯU Ý:
+    // - Không thao tác trực tiếp state + _onPageChangedCallback để cho phép
+    //   lớp con override goToPage() (ví dụ: tự gọi loadDataFromApi)
+    // - Điều này tránh lỗi "loading quay mãi" khi enableApiPagination(true)
+    //   nhưng không thiết lập callback qua setupApiPagination()
+    if (state.paginationState.useApiPagination) {
+      // Đưa về trang đầu, goToPage sẽ xử lý:
+      // - set isLoading / currentPageData
+      // - gọi callback hoặc logic override ở lớp con
+      goToPage(0);
+      return;
+    }
+
+    // Áp dụng lọc local và cập nhật dữ liệu
     _applyFilters();
   }
 
@@ -235,7 +451,16 @@ class TableNotifier<T> extends TableNotifierInterface<T> {
       ),
     );
 
-    // Áp dụng lọc và cập nhật dữ liệu
+    // Nếu đang dùng API pagination, kích hoạt reload từ API với filter mới
+    // Thay vì thao tác trực tiếp trên state, dùng goToPage(0) để:
+    // - Kích hoạt callback đã setup hoặc
+    // - Cho phép lớp con override goToPage() tự gọi API
+    if (state.paginationState.useApiPagination) {
+      goToPage(0);
+      return;
+    }
+
+    // Áp dụng lọc local và cập nhật dữ liệu
     _applyFilters();
   }
 
@@ -243,7 +468,16 @@ class TableNotifier<T> extends TableNotifierInterface<T> {
   void clearAllFilters() {
     state = state.copyWith(filterState: const TableFilterState());
 
-    // Áp dụng lọc và cập nhật dữ liệu
+    // Nếu đang dùng API pagination, kích hoạt reload từ API với filter mới
+    // Sử dụng goToPage(0) để tương thích với cả:
+    // - setupApiPagination(onPageChanged: ...)
+    // - override goToPage() trong lớp con
+    if (state.paginationState.useApiPagination) {
+      goToPage(0);
+      return;
+    }
+
+    // Áp dụng lọc local và cập nhật dữ liệu
     _applyFilters();
   }
 
@@ -261,7 +495,6 @@ class TableNotifier<T> extends TableNotifierInterface<T> {
 
     // Cập nhật pagination
     final paginatedData = _getPaginatedData(sortedData);
-
     state = state.copyWith(
       filteredData: sortedData,
       currentPageData: paginatedData,
@@ -274,19 +507,26 @@ class TableNotifier<T> extends TableNotifierInterface<T> {
 
   /// Lọc dữ liệu theo một cột cụ thể
   List<T> _filterDataByColumn(List<T> data, ColumnFilter filter) {
-    if (_valueGetter == null) return data;
+    if (_valueGetter == null) {
+      return data;
+    }
 
-    return data.where((item) {
+    final filteredData = data.where((item) {
       final value = _valueGetter!(item, filter.columnIndex);
-      return _evaluateFilterCondition(value, filter);
+      final result = _evaluateFilterCondition(value, filter);
+      return result;
     }).toList();
+    
+    return filteredData;
   }
 
   /// Đánh giá điều kiện lọc
   bool _evaluateFilterCondition(dynamic value, ColumnFilter filter) {
+    
     // Lọc theo filter chọn nhiều giá trị
     if (filter.filterType == FilterType.select) {
-      return filter.selectedValues.contains(value);
+      final result = filter.selectedValues.contains(value);
+      return result;
     }
 
     // Lọc theo khoảng số [min, max]

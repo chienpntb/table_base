@@ -20,30 +20,59 @@ class TablePaginationState {
   final int totalItems;
   final int indexStart;
   final int indexEnd;
+  
+  // Thêm các thuộc tính để hỗ trợ phân trang từ API
+  final bool useApiPagination;
+  final int? totalPagesFromApi;
+  final int? currentPageFromApi;
 
   const TablePaginationState({
     this.currentPage = 0,
     this.itemsPerPage = 50,
     this.totalItems = 0,
+    this.useApiPagination = false,
+    this.totalPagesFromApi,
+    this.currentPageFromApi,
   }) : indexStart = currentPage * itemsPerPage + 1,
        indexEnd =
            (currentPage + 1) * itemsPerPage > totalItems
                ? totalItems
                : (currentPage + 1) * itemsPerPage;
 
-  int get totalPages => (totalItems / itemsPerPage).ceil();
-  bool get canGoNext => currentPage < totalPages - 1;
-  bool get canGoPrevious => currentPage > 0;
+  // Getter totalPages dựa trên chế độ phân trang
+  int get totalPages {
+    if (useApiPagination && totalPagesFromApi != null) {
+      return totalPagesFromApi!;
+    }
+    return (totalItems / itemsPerPage).ceil();
+  }
+  
+  // Getter currentDisplayPage dựa trên chế độ phân trang
+  int get currentDisplayPage {
+    if (useApiPagination && currentPageFromApi != null) {
+      return currentPageFromApi!;
+    }
+    return currentPage;
+  }
+  
+  bool get canGoNext => currentDisplayPage < totalPages - 1;
+  bool get canGoPrevious => currentDisplayPage > 0;
 
   TablePaginationState copyWith({
     int? currentPage,
     int? itemsPerPage,
     int? totalItems,
+    bool? useApiPagination,
+    int? totalPagesFromApi,
+    int? currentPageFromApi,
   }) {
     return TablePaginationState(
       currentPage: currentPage ?? this.currentPage,
       itemsPerPage: itemsPerPage ?? this.itemsPerPage,
       totalItems: totalItems ?? this.totalItems,
+      useApiPagination: useApiPagination ?? this.useApiPagination,
+      totalPagesFromApi: totalPagesFromApi ?? this.totalPagesFromApi,
+      currentPageFromApi: currentPageFromApi ?? this.currentPageFromApi,
     );
   }
 }
@@ -202,10 +231,26 @@ class GenericTableState<T> {
     );
   }
 
-  List<T> get selectedItems =>
-      filteredData
-          .where(
-            (item) => selectionState.selectedIds.contains((item as dynamic).id),
-          )
-          .toList();
+  /// Lấy danh sách các item đã chọn trên trang hiện tại
+  List<T> get selectedItems {
+    // Khi dùng API pagination, lấy từ currentPageData
+    // Khi dùng local pagination, lấy từ filteredData
+    final List<T> sourceData = paginationState.useApiPagination
+        ? currentPageData
+        : filteredData;
+    
+    return sourceData
+        .where((item) {
+          final dynamic id = (item as dynamic).id;
+          final idString = id?.toString();
+          return idString != null && selectionState.selectedIds.contains(idString);
+        })
+        .toList();
+  }
+
+  /// Lấy danh sách ID đã chọn (dùng để query API khi cần lấy tất cả items từ nhiều trang)
+  List<String> get selectedIds => selectionState.selectedIds.toList();
+
+  /// Kiểm tra có item nào được chọn không
+  bool get hasSelectedItems => selectionState.selectedIds.isNotEmpty;
 }
